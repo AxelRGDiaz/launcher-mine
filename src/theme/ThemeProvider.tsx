@@ -49,6 +49,10 @@ function applyCssVariables(config: LauncherConfig) {
   root.style.setProperty("--color-text", palette.text);
   root.style.setProperty("--color-text-muted", palette.textMuted);
   root.classList.toggle("dark", config.theme !== "light");
+  // Sin esto, WebView2 sigue pintando controles nativos (select, checkbox,
+  // scrollbar) según el tema del sistema operativo en vez del tema elegido
+  // en el launcher, sin importar que el resto de la UI ya haya cambiado.
+  root.style.colorScheme = config.theme === "light" ? "light" : "dark";
   document.title = config.launcherName;
 }
 
