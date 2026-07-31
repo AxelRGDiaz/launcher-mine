@@ -17,3 +17,4 @@ src-tauri/gen/
 /banner-3.png
 assets/app_icon.png
 assets/server_icon.png
+web/.vercel
