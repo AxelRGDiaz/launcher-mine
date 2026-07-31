@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PIKIPIKI LAUNCHER</title>
+<meta name="description" content="PIKIPIKI LAUNCHER — un launcher de Minecraft ligero, personalizable y sin anuncios ni telemetría." />
+<link rel="icon" href="assets/icon.png" />
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --bg-raised: #151517;
+    --bg-sunken: #0f0f10;
+    --border: #26262a;
+    --text: #f3f3f4;
+    --text-muted: #9a9aa1;
+    --primary: #e32400;
+    --primary-dark: #b71c00;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  header.nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11,11,12,0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  header.nav .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+  .brand img { width: 32px; height: 32px; border-radius: 8px; }
+
+  .hero {
+    position: relative;
+    padding: 96px 0 80px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(60% 50% at 50% 0%, rgba(227,36,0,0.18), transparent 70%);
+    pointer-events: none;
+  }
+  .hero img.logo {
+    width: 112px; height: 112px; border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(227,36,0,0.25);
+    margin-bottom: 28px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+  .hero p.tagline {
+    color: var(--text-muted);
+    font-size: 18px;
+    max-width: 560px;
+    margin: 0 auto 32px;
+  }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    border: 1px solid var(--border);
+  }
+  .btn.primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .btn.primary:hover { background: var(--primary-dark); text-decoration: none; }
+  .btn.ghost { color: var(--text); }
+  .btn.ghost:hover { background: var(--bg-raised); text-decoration: none; }
+
+  section { padding: 64px 0; border-top: 1px solid var(--border); }
+  section h2 {
+    font-size: 26px;
+    margin: 0 0 8px;
+    text-align: center;
+  }
+  section p.lead {
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 520px;
+    margin: 0 auto 40px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+  }
+  .card .icon {
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: rgba(227,36,0,0.15);
+    color: var(--primary);
+    font-size: 18px;
+    margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0; color: var(--text-muted); font-size: 14px; }
+
+  .banner-shot {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }
+  .banner-shot img { display: block; width: 100%; height: auto; opacity: 0.9; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  footer a { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <img src="assets/icon.png" alt="" />
+      <span>PIKIPIKI LAUNCHER</span>
+    </div>
+    <nav>
+      <a href="#features" class="btn ghost" style="border:none;padding:8px 4px;">Características</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <img class="logo" src="assets/logo.png" alt="PIKIPIKI LAUNCHER" />
+    <h1>PIKIPIKI LAUNCHER</h1>
+    <p class="tagline">
+      Un launcher de Minecraft ligero, personalizable y sin anuncios ni telemetría —
+      hecho para jugar sin distracciones.
+    </p>
+    <div class="cta-row">
+      <a class="btn primary" href="#features">Ver características</a>
+      <a class="btn ghost" href="mailto:clatua24@hotmail.com">Contacto</a>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Todo lo que necesitas, nada de lo que sobra</h2>
+    <p class="lead">Proyecto personal y educativo — sin publicidad, sin cuentas de rastreo, sin distribución comercial.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h3>Ligero de verdad</h3>
+        <p>Construido con Tauri y Rust: arranca rápido y usa una fracción de la RAM de otros launchers.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧩</div>
+        <h3>Multi-loader</h3>
+        <p>Vanilla, Fabric, Quilt, Forge, NeoForge y soporte para importar OptiFine.</p>
+      </div>
+      <div class="card">
+        <div class="icon">👤</div>
+        <h3>Cuentas Microsoft y sin conexión</h3>
+        <p>Inicia sesión con tu cuenta real de Minecraft, o usa un perfil sin conexión para pruebas locales.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🌎</div>
+        <h3>Servidor incluido</h3>
+        <p>Cada instancia nueva llega con nuestro servidor, MUNDO PIKIPIKI, ya agregado a la lista multijugador.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🎨</div>
+        <h3>100% personalizable</h3>
+        <p>Nombre, colores, logo y textos configurables desde un simple archivo de configuración.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔒</div>
+        <h3>Sin ads, sin telemetría</h3>
+        <p>No recolectamos datos ni mostramos publicidad. El launcher hace una sola cosa: lanzar el juego.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Hecho con cariño para un pequeño grupo de jugadores</h2>
+    <p class="lead">Un proyecto personal, sin fines comerciales.</p>
+    <div class="banner-shot">
+      <img src="assets/banner.jpg" alt="PIKIPIKI LAUNCHER banner" />
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>PIKIPIKI LAUNCHER — proyecto personal, no comercial · <a href="mailto:clatua24@hotmail.com">clatua24@hotmail.com</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
