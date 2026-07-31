@@ -1,0 +1,58 @@
+import type { LauncherConfig } from "@/lib/types";
+
+export type ScreenId = "home" | "instances" | "mods" | "accounts" | "settings" | "about";
+
+const NAV_ITEMS: { id: ScreenId; label: string }[] = [
+  { id: "home", label: "Inicio" },
+  { id: "instances", label: "Instancias" },
+  { id: "mods", label: "Mods" },
+  { id: "accounts", label: "Cuentas" },
+  { id: "settings", label: "Configuración" },
+  { id: "about", label: "Acerca de" },
+];
+
+interface SidebarProps {
+  active: ScreenId;
+  onNavigate: (screen: ScreenId) => void;
+  config: LauncherConfig;
+}
+
+export function Sidebar({ active, onNavigate, config }: SidebarProps) {
+  const initials = config.launcherName
+    .split(/\s+/)
+    .map((word) => word[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-surface-sunken">
+      <div className="flex items-center gap-3 px-4 py-5">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white"
+          style={{ backgroundColor: config.primaryColor }}
+        >
+          {initials || "ML"}
+        </div>
+        <span className="truncate text-sm font-semibold text-text">{config.launcherName}</span>
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-1 px-2">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+              active === item.id
+                ? "bg-surface-raised text-text"
+                : "text-text-muted hover:bg-surface-raised/60 hover:text-text"
+            }`}
+            style={active === item.id ? { boxShadow: `inset 2px 0 0 ${config.primaryColor}` } : undefined}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+    </aside>
+  );
+}

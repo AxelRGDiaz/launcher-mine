@@ -1,0 +1,16 @@
+{
+  "launcherName": "MiLauncher",
+  "logoPath": "assets/logo.png",
+  "iconPath": "assets/icon.png",
+  "theme": "dark",
+  "primaryColor": "#4CAF50",
+  "backgroundImage": null,
+  "welcomeText": "Bienvenido a MiLauncher",
+  "supportUrl": "https://github.com/tu-usuario/tu-launcher",
+  "defaultMinRamMb": 2048,
+  "defaultMaxRamMb": 4096,
+  "autoUpdateJava": true,
+  "showSnapshots": false,
+  "instancesDir": null,
+  "javaDir": null
+}

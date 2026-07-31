@@ -1,0 +1,11 @@
+{
+  "name": "light",
+  "colors": {
+    "surface": "#f5f5f7",
+    "surfaceRaised": "#ffffff",
+    "surfaceSunken": "#e8e8ea",
+    "border": "#d8d8dc",
+    "text": "#1b1b1f",
+    "textMuted": "#6a6a72"
+  }
+}

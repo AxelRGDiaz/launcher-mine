@@ -1,0 +1,46 @@
+name: Build Windows installer
+
+# Tauri no cross-compila de forma fiable macOS -> Windows para el bundler
+# nativo (NSIS/MSI), así que el .exe/.msi real se produce aquí, en un
+# runner windows-latest. Dispara manualmente o en cada push a main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias del frontend
+        run: npm ci
+
+      - name: Compilar launcher e instalador (.msi / .exe)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Sin `tagName`/`releaseId`: solo sube los artefactos del build,
+          # no crea una release automáticamente. Añade eso cuando quieras
+          # publicar releases de verdad.
+          args: --target x86_64-pc-windows-msvc
+
+      - name: Subir instalador como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
