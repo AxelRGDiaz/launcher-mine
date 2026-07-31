@@ -2,13 +2,18 @@ import { useEffect } from "react";
 import { useUpdater } from "@/lib/useUpdater";
 
 export function UpdateBanner() {
-  const { status, update, progress, error, checkForUpdate, installAndRelaunch } = useUpdater();
+  const { status, update, progress, installAndRelaunch, checkForUpdate } = useUpdater();
 
   useEffect(() => {
     void checkForUpdate();
-  }, [checkForUpdate]);
+    // No mostramos errores de esta revisión automática (p. ej. antes de que
+    // exista la primera GitHub Release, el updater falla al buscarla) — el
+    // usuario puede revisar manualmente desde Acerca de si quiere ver el
+    // detalle del error.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (status === "idle" || status === "checking" || status === "up-to-date") return null;
+  if (status !== "available" && status !== "downloading" && status !== "ready") return null;
 
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-4 py-2 text-sm">
@@ -27,7 +32,6 @@ export function UpdateBanner() {
       )}
       {status === "downloading" && <span className="text-text-muted">Descargando actualización… {progress}%</span>}
       {status === "ready" && <span className="text-text-muted">Reiniciando…</span>}
-      {status === "error" && <span className="text-red-400">No se pudo comprobar actualizaciones: {error}</span>}
     </div>
   );
 }
