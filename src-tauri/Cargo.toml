@@ -1,6 +1,6 @@
 [package]
 name = "pikipiki-launcher"
-version = "0.1.1"
+version = "0.1.2"
 description = "Launcher de Minecraft personalizable, ligero y sin telemetría"
 edition = "2021"
 rust-version = "1.77"

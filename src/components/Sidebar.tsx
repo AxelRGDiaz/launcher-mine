@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import type { LauncherConfig } from "@/lib/types";
 import { useLauncherConfig } from "@/theme/ThemeProvider";
 
@@ -20,6 +22,10 @@ interface SidebarProps {
 
 export function Sidebar({ active, onNavigate, config }: SidebarProps) {
   const { images } = useLauncherConfig();
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    void getVersion().then(setVersion);
+  }, []);
   const initials = config.launcherName
     .split(/\s+/)
     .map((word) => word[0])
@@ -59,6 +65,8 @@ export function Sidebar({ active, onNavigate, config }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      {version && <p className="px-4 pb-4 text-[11px] text-text-muted">v{version}</p>}
     </aside>
   );
 }
