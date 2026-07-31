@@ -54,7 +54,7 @@ pub enum McError {
     Io(#[from] std::io::Error),
     #[error("JSON inválido: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("instancia no encontrada: {0}")]
+    #[error("versión no encontrada: {0}")]
     InstanceNotFound(String),
     #[error("el instalador falló: {0}")]
     InstallerFailed(String),

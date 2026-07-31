@@ -5,7 +5,7 @@ export type ScreenId = "home" | "instances" | "mods" | "accounts" | "settings" |
 
 const NAV_ITEMS: { id: ScreenId; label: string }[] = [
   { id: "home", label: "Inicio" },
-  { id: "instances", label: "Instancias" },
+  { id: "instances", label: "Versiones" },
   { id: "mods", label: "Mods" },
   { id: "accounts", label: "Cuentas" },
   { id: "settings", label: "Configuración" },

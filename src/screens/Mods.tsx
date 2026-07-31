@@ -38,13 +38,13 @@ export function Mods() {
       <div>
         <h1 className="text-lg font-semibold text-text">Mods</h1>
         <p className="text-sm text-text-muted">
-          Coloca archivos <code>.jar</code> en la carpeta <code>mods</code> de la instancia y actívalos aquí.
+          Coloca archivos <code>.jar</code> en la carpeta <code>mods</code> de la versión y actívalos aquí.
         </p>
       </div>
 
       {instances.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-muted">
-          Crea una instancia primero en la pestaña Instancias.
+          Crea una versión primero en la pestaña Versiones.
         </p>
       ) : (
         <>
@@ -64,7 +64,7 @@ export function Mods() {
             {loading && <p className="text-sm text-text-muted">Cargando…</p>}
             {!loading && mods.length === 0 && (
               <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-muted">
-                No hay mods instalados en esta instancia todavía.
+                No hay mods instalados en esta versión todavía.
               </p>
             )}
             {mods.map((mod) => (

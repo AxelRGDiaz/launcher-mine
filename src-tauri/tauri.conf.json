@@ -23,7 +23,15 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost https://*.mojang.com https://*.minecraft.net data:; connect-src 'self' https://*.mojang.com https://*.minecraft.net https://*.adoptium.net https://api.adoptium.net https://*.modrinth.com; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost https://*.mojang.com https://*.minecraft.net data:; connect-src 'self' https://*.mojang.com https://*.minecraft.net https://*.adoptium.net https://api.adoptium.net https://*.modrinth.com https://github.com https://*.githubusercontent.com; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJGNjUzRjc4ODlEQjdDOUQKUldTZGZOdUplRDlsdnc2Ti85Y2svOWxudUtnWEtTemNhRlJ4K2NzZVdCU09RUWRXME9xaFFyZzgK",
+      "endpoints": [
+        "https://github.com/AxelRGDiaz/launcher-mine/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {

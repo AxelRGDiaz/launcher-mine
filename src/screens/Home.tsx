@@ -69,7 +69,7 @@ export function Home({ onNavigate }: HomeProps) {
         <h1 className="text-2xl font-semibold text-white drop-shadow">{config?.welcomeText}</h1>
         {primaryInstance && (
           <p className="mt-2 text-sm text-white/80 drop-shadow">
-            Última instancia: <span className="text-white">{primaryInstance.name}</span> ({primaryInstance.minecraftVersion})
+            Última versión: <span className="text-white">{primaryInstance.name}</span> ({primaryInstance.minecraftVersion})
           </p>
         )}
       </div>
@@ -79,7 +79,7 @@ export function Home({ onNavigate }: HomeProps) {
         disabled={launching}
         className="rounded-xl bg-primary px-10 py-4 text-lg font-semibold text-white shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-60"
       >
-        {launching ? "Preparando…" : primaryInstance ? "Jugar" : "Crear tu primera instancia"}
+        {launching ? "Preparando…" : primaryInstance ? "Jugar" : "Crear tu primera versión"}
       </button>
 
       {error && <p className="max-w-md text-sm text-red-400">{error}</p>}

@@ -357,7 +357,7 @@ pub async fn install_instance(app: AppHandle, state: State<'_, AppState>, instan
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un loader asignado".to_string())?;
             fabric_like::install(
                 &state.http,
                 &state.downloads,
@@ -375,7 +375,7 @@ pub async fn install_instance(app: AppHandle, state: State<'_, AppState>, instan
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un loader asignado".to_string())?;
             let java_installation = required_java_for(&app, &state, &cfg, &paths, &instance.minecraft_version).await?;
             let app_data = config::app_data_dir(&app);
             forge_like::install(
@@ -396,7 +396,7 @@ pub async fn install_instance(app: AppHandle, state: State<'_, AppState>, instan
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene un archivo de OptiFine importado".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un archivo de OptiFine importado".to_string())?;
             let java_installation = required_java_for(&app, &state, &cfg, &paths, &instance.minecraft_version).await?;
             let app_data = config::app_data_dir(&app);
             optifine::install(
@@ -441,7 +441,7 @@ pub async fn launch_instance(
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un loader asignado".to_string())?;
             fabric_like::load_cached_detail(&paths, flavor, &instance.minecraft_version, &loader_version)
                 .await
                 .map_err(to_err)?
@@ -451,7 +451,7 @@ pub async fn launch_instance(
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un loader asignado".to_string())?;
             forge_like::load_cached_detail(&paths, flavor, &instance.minecraft_version, &loader_version)
                 .await
                 .map_err(to_err)?
@@ -460,7 +460,7 @@ pub async fn launch_instance(
             let loader_version = instance
                 .loader_version
                 .clone()
-                .ok_or_else(|| "la instancia no tiene un archivo de OptiFine importado".to_string())?;
+                .ok_or_else(|| "esta versión no tiene un archivo de OptiFine importado".to_string())?;
             optifine::load_cached_detail(&paths, &instance.minecraft_version, &loader_version)
                 .await
                 .map_err(to_err)?

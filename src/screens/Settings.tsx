@@ -124,7 +124,7 @@ export function Settings() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Rendimiento</h2>
         <p className="text-xs text-text-muted">
           Memoria del sistema detectada: {(systemMemoryMb / 1024).toFixed(1)} GB. Estos valores son el
-          default para instancias nuevas; cada instancia puede sobreescribirlos.
+          default para versiones nuevas; cada versión puede sobreescribirlos.
         </p>
         <RamSlider
           label="RAM mínima"
@@ -147,7 +147,7 @@ export function Settings() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Servidor por defecto</h2>
         <p className="text-xs text-text-muted">
-          Se agrega automáticamente a la lista de multijugador de cada instancia nueva. Deja el nombre vacío para no
+          Se agrega automáticamente a la lista de multijugador de cada versión nueva. Deja el nombre vacío para no
           agregar ninguno.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

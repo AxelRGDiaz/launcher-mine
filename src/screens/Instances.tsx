@@ -152,7 +152,7 @@ export function Instances() {
   }
 
   async function handleDelete(instance: Instance) {
-    if (!confirm(`¿Eliminar la instancia "${instance.name}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar la versión "${instance.name}"? Esta acción no se puede deshacer.`)) return;
     await api.instances.delete(instance.id);
     await refreshInstances();
   }
@@ -187,8 +187,8 @@ export function Instances() {
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-text">Instancias</h1>
-          <p className="text-sm text-text-muted">Cada instancia es un perfil independiente de Minecraft.</p>
+          <h1 className="text-lg font-semibold text-text">Versiones</h1>
+          <p className="text-sm text-text-muted">Cada versión es un perfil independiente de Minecraft.</p>
         </div>
         <div className="flex items-center gap-2">
           {accounts.length > 0 && (
@@ -223,7 +223,7 @@ export function Instances() {
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nombre de la instancia"
+              placeholder="Nombre de la versión"
               className="input"
             />
             <select value={newLoader} onChange={(e) => setNewLoader(e.target.value as LoaderKind)} className="input">
@@ -308,7 +308,7 @@ export function Instances() {
       <div className="flex flex-col gap-2">
         {instances.length === 0 && (
           <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-muted">
-            Todavía no hay instancias. Crea una para empezar a jugar.
+            Todavía no hay versiones. Crea una para empezar a jugar.
           </p>
         )}
         {instances.map((instance) => (

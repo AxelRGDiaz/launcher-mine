@@ -2,7 +2,12 @@ name: Build Windows installer
 
 # Tauri no cross-compila de forma fiable macOS -> Windows para el bundler
 # nativo (NSIS/MSI), así que el .exe/.msi real se produce aquí, en un
-# runner windows-latest. Dispara manualmente o en cada push a main.
+# runner windows-latest.
+#
+# - Push a main / manual: solo compila y sube el instalador como artefacto
+#   de la corrida (para probar, no toca releases ni el auto-updater).
+# - Push de un tag "vX.Y.Z": además publica una GitHub Release firmada con
+#   `latest.json`, que es lo que el auto-updater de la app consulta.
 on:
   workflow_dispatch:
   push:
@@ -27,17 +32,31 @@ jobs:
       - name: Instalar dependencias del frontend
         run: npm ci
 
-      - name: Compilar launcher e instalador (.msi / .exe)
+      - name: Compilar y publicar release (tag vX.Y.Z)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "PIKIPIKI LAUNCHER ${{ github.ref_name }}"
+          releaseBody: "Ver el historial de commits para el detalle de cambios."
+          releaseDraft: false
+          prerelease: false
+          args: --target x86_64-pc-windows-msvc
+
+      - name: Compilar (solo build, sin release)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Sin `tagName`/`releaseId`: solo sube los artefactos del build,
-          # no crea una release automáticamente. Añade eso cuando quieras
-          # publicar releases de verdad.
           args: --target x86_64-pc-windows-msvc
 
-      - name: Subir instalador como artefacto
+      - name: Subir instalador como artefacto de la corrida
+        if: "!startsWith(github.ref, 'refs/tags/v')"
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
