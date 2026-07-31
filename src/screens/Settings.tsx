@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import { useLauncherConfig } from "@/theme/ThemeProvider";
+import { applyCssVariables, useLauncherConfig } from "@/theme/ThemeProvider";
 import type { JavaInstallation } from "@/lib/types";
 import { RamSlider } from "@/components/RamSlider";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -22,6 +22,18 @@ export function Settings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setDraft(config), [config]);
+
+  // Vista previa en vivo: el tema/color se ven al elegirlos, sin esperar a
+  // "Guardar cambios". Si se sale de esta pantalla sin guardar, se revierte
+  // a lo que de verdad está persistido (config), para no dejar la UI en un
+  // estado a medias.
+  useEffect(() => {
+    if (draft) applyCssVariables(draft);
+    return () => {
+      if (config) applyCssVariables(config);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft?.theme, draft?.primaryColor]);
 
   useEffect(() => {
     void api.system.memoryMb().then(setSystemMemoryMb);

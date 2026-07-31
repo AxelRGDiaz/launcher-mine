@@ -38,7 +38,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function applyCssVariables(config: LauncherConfig) {
+export function applyCssVariables(config: LauncherConfig) {
   const palette = THEME_PALETTES[config.theme === "light" ? "light" : "dark"];
   const root = document.documentElement;
   root.style.setProperty("--color-primary", config.primaryColor);
