@@ -1,28 +1,25 @@
-//! Gestión de cuentas. En esta fase solo existe la cuenta **offline/dev**:
-//! sirve para probar de extremo a extremo la descarga/lanzamiento de
-//! Vanilla sin depender todavía de la autenticación de Microsoft.
+//! Gestión de cuentas: **offline/dev** (pruebas locales, ver nota legal más
+//! abajo) y **Microsoft** (login real vía device code + Xbox Live + XSTS +
+//! Minecraft Services, implementado en `microsoft.rs`).
 //!
-//! IMPORTANTE (nota legal/técnica): esto NO es un "crack" ni un bypass de
-//! autenticación. Es exactamente el mismo modo "cuenta sin conexión" que
-//! ofrecen MultiMC/Prism Launcher para pruebas en un solo jugador con una
-//! copia ya poseída. El multijugador y Realms los valida el propio servidor
-//! de Mojang/Xbox del lado remoto, así que este modo no permite (ni intenta
-//! permitir) jugar online sin una cuenta de Microsoft real.
-//!
-//! La fase 2 añadirá `AccountKind::Microsoft` implementando el flujo oficial
-//! device code (OAuth2 del Identity Platform de Microsoft) + intercambio de
-//! tokens con Xbox Live / XSTS / Minecraft Services. Ese flujo requiere que
-//! quien despliegue el launcher registre su propia aplicación en Azure AD
-//! (gratis, portal.azure.com) para obtener un `client_id` — es un requisito
-//! de Microsoft que no se puede evitar ni "incluir" de forma genérica.
+//! IMPORTANTE (nota legal/técnica sobre `Offline`): esto NO es un "crack" ni
+//! un bypass de autenticación. Es exactamente el mismo modo "cuenta sin
+//! conexión" que ofrecen MultiMC/Prism Launcher para pruebas en un solo
+//! jugador con una copia ya poseída. El multijugador y Realms los valida el
+//! propio servidor de Mojang/Xbox del lado remoto, así que este modo no
+//! permite (ni intenta permitir) jugar online sin una cuenta de Microsoft
+//! real.
 
+pub mod microsoft;
+
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AccountKind {
     Offline,
-    // Microsoft, // fase 2
+    Microsoft,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,9 +30,15 @@ pub struct Account {
     pub username: String,
     pub uuid: String,
     /// Para `Offline` esto no es un token real de sesión: el juego lo recibe
-    /// pero no se valida contra ningún servicio de Mojang/Xbox.
+    /// pero no se valida contra ningún servicio de Mojang/Xbox. Para
+    /// `Microsoft` es el access token real de Minecraft Services.
     pub access_token: String,
     pub skin_url: Option<String>,
+    /// Solo `Microsoft`: para renovar la sesión sin pedir login de nuevo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 /// UUID determinista igual al que calcula el propio cliente de Minecraft
@@ -57,6 +60,8 @@ pub fn create_offline_account(username: &str) -> Account {
         uuid: uuid.to_string(),
         access_token: "0".to_string(),
         skin_url: None,
+        refresh_token: None,
+        expires_at: None,
     }
 }
 
@@ -116,4 +121,15 @@ pub async fn remove_account(app_data_dir: &std::path::Path, account_id: &str) ->
     let mut accounts = list_accounts(app_data_dir).await?;
     accounts.retain(|a| a.id != account_id);
     save_accounts(app_data_dir, &accounts).await
+}
+
+/// Agrega la cuenta o, si ya existía una con el mismo `id` (mismo UUID de
+/// Minecraft), la reemplaza — así renovar el token de una cuenta Microsoft
+/// no crea una entrada duplicada.
+pub async fn upsert_account(app_data_dir: &std::path::Path, account: Account) -> Result<Account, AccountError> {
+    let mut accounts = list_accounts(app_data_dir).await?;
+    accounts.retain(|a| a.id != account.id);
+    accounts.push(account.clone());
+    save_accounts(app_data_dir, &accounts).await?;
+    Ok(account)
 }

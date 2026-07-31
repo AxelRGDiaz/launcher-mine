@@ -11,12 +11,13 @@
 use futures_util::StreamExt;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
+use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex as AsyncMutex, Semaphore};
 
 const MAX_CONCURRENT_DOWNLOADS: usize = 8;
 
@@ -68,15 +69,33 @@ pub type ProgressCallback = Arc<dyn Fn(DownloadProgress) + Send + Sync>;
 
 pub struct DownloadManager {
     client: reqwest::Client,
+    /// Muchos assets de Minecraft comparten contenido byte a byte (varios
+    /// nombres virtuales con el mismo hash), así que apuntan al mismo
+    /// `destination`. Sin este candado, dos descargas concurrentes para el
+    /// mismo destino escriben al mismo `.part` a la vez y lo corrompen —
+    /// esto pasó de verdad en pruebas (`SHA1 no coincide` en assets de
+    /// idioma). Un mutex por ruta de destino serializa esos casos sin
+    /// serializar el resto de la descarga por lotes.
+    in_flight: StdMutex<HashMap<PathBuf, Arc<AsyncMutex<()>>>>,
 }
 
 impl DownloadManager {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
-            .user_agent(concat!("MiLauncher/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("PikiPikiLauncher/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("no se pudo construir el cliente HTTP");
-        Self { client }
+        Self {
+            client,
+            in_flight: StdMutex::new(HashMap::new()),
+        }
+    }
+
+    fn lock_for(&self, destination: &Path) -> Arc<AsyncMutex<()>> {
+        let mut map = self.in_flight.lock().expect("in_flight mutex envenenado");
+        map.entry(destination.to_path_buf())
+            .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+            .clone()
     }
 
     /// Descarga un único archivo, usando caché por hash y reanudación.
@@ -87,6 +106,12 @@ impl DownloadManager {
         cache_dir: &Path,
         on_progress: &ProgressCallback,
     ) -> Result<(), DownloadError> {
+        // Serializa cualquier otra descarga que apunte exactamente al mismo
+        // destino (ver doc de `in_flight`). El resto del lote sigue en
+        // paralelo con normalidad.
+        let destination_lock = self.lock_for(&req.destination);
+        let _destination_guard = destination_lock.lock().await;
+
         if let Some(parent) = req.destination.parent() {
             fs::create_dir_all(parent)
                 .await

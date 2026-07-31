@@ -6,7 +6,7 @@
 use super::install::{rule_applies, DownloadArtifactPath, VersionDetail};
 use super::instance::Instance;
 use super::{GamePaths, McError};
-use crate::accounts::Account;
+use crate::accounts::{Account, AccountKind};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,10 @@ pub struct LaunchRequest<'a> {
     pub default_max_ram_mb: u32,
     pub launcher_name: String,
     pub launcher_version: String,
+    /// Texto que Minecraft muestra junto a "Minecraft <versión>" en la
+    /// esquina del menú principal — separado del nombre del launcher porque
+    /// suele convenir más corto.
+    pub version_type_label: String,
 }
 
 pub async fn launch(paths: &GamePaths, req: LaunchRequest<'_>) -> Result<(Child, PathBuf), McError> {
@@ -31,7 +35,13 @@ pub async fn launch(paths: &GamePaths, req: LaunchRequest<'_>) -> Result<(Child,
 
     prepare_natives(paths, req.detail, &natives_dir).await?;
 
-    let client_jar = paths.versions.join(&req.detail.id).join(format!("{}.jar", req.detail.id));
+    // El client.jar siempre vive bajo la versión Vanilla base, aunque
+    // `req.detail.id` sea el id fusionado de un loader (p.ej.
+    // "fabric-loader-0.16.9-1.21.1") — ver `fabric_like::install`.
+    let client_jar = paths
+        .versions
+        .join(&req.instance.minecraft_version)
+        .join(format!("{}.jar", req.instance.minecraft_version));
     let classpath = build_classpath(paths, req.detail, &client_jar);
 
     let min_ram = req.instance.min_ram_mb.unwrap_or(req.default_min_ram_mb);
@@ -181,9 +191,13 @@ fn build_substitution_vars(
     vars.insert("auth_access_token", req.account.access_token.clone());
     vars.insert("auth_xuid", "0".to_string());
     vars.insert("clientid", "0".to_string());
-    vars.insert("user_type", "legacy".to_string());
+    let user_type = match req.account.kind {
+        AccountKind::Microsoft => "msa",
+        AccountKind::Offline => "legacy",
+    };
+    vars.insert("user_type", user_type.to_string());
     vars.insert("user_properties", "{}".to_string());
-    vars.insert("version_type", "MiLauncher".to_string());
+    vars.insert("version_type", req.version_type_label.clone());
     vars.insert("resolution_width", "925".to_string());
     vars.insert("resolution_height", "530".to_string());
     vars

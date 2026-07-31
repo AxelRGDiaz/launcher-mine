@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
+import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { api } from "@/lib/api";
-import type { Account } from "@/lib/types";
+import { useLauncherConfig } from "@/theme/ThemeProvider";
+import type { Account, DeviceCodeInfo } from "@/lib/types";
 
 export function Accounts() {
+  const { config } = useLauncherConfig();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const [deviceCode, setDeviceCode] = useState<DeviceCodeInfo | null>(null);
+  const [msStatus, setMsStatus] = useState<"idle" | "waiting" | "polling">("idle");
 
   async function refresh() {
     setAccounts(await api.accounts.list());
@@ -31,36 +37,83 @@ export function Accounts() {
     await refresh();
   }
 
+  async function handleMicrosoftLogin() {
+    setError(null);
+    setMsStatus("waiting");
+    try {
+      const info = await api.accounts.startMicrosoftLogin();
+      setDeviceCode(info);
+      void openUrl(info.verificationUri);
+      setMsStatus("polling");
+      await api.accounts.completeMicrosoftLogin();
+      setDeviceCode(null);
+      setMsStatus("idle");
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+      setDeviceCode(null);
+      setMsStatus("idle");
+    }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <div>
         <h1 className="text-lg font-semibold text-text">Cuentas</h1>
         <p className="text-sm text-text-muted">
-          Cuentas sin conexión para pruebas en un solo jugador. La autenticación oficial de
-          Microsoft/Xbox llegará en una fase posterior (requiere registrar una app en Azure AD).
+          Cuentas de Microsoft para jugar en línea, o cuentas sin conexión para pruebas en un solo jugador.
         </p>
-      </div>
-
-      <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
-        Modo sin conexión: válido solo para un jugador con una copia legítima ya instalada. No
-        funciona para multijugador ni Realms, ya que esos los valida el propio servidor de Mojang.
       </div>
 
       {error && (
         <div className="rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</div>
       )}
 
-      <div className="flex gap-2">
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Nombre de usuario (3-16 caracteres)"
-          className="flex-1 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-text outline-none focus:border-primary"
-        />
-        <button onClick={handleAdd} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white">
-          Añadir cuenta
-        </button>
-      </div>
+      {/* Microsoft */}
+      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Cuenta Microsoft</h2>
+        {!config?.microsoftClientId && (
+          <p className="text-xs text-text-muted">
+            No hay un <code>microsoftClientId</code> configurado — ver el README para registrar tu propia app en
+            Microsoft Entra (requisito de Microsoft, gratis).
+          </p>
+        )}
+        {config?.microsoftClientId && msStatus === "idle" && (
+          <button
+            onClick={handleMicrosoftLogin}
+            className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white"
+          >
+            Iniciar sesión con Microsoft
+          </button>
+        )}
+        {deviceCode && (
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-sunken p-3">
+            <p className="text-sm text-text">
+              Se abrió <span className="text-primary">{deviceCode.verificationUri}</span> en tu navegador — ingresa
+              este código:
+            </p>
+            <p className="text-center text-2xl font-bold tracking-widest text-text">{deviceCode.userCode}</p>
+            <p className="text-xs text-text-muted">Esperando a que termines de iniciar sesión ahí…</p>
+          </div>
+        )}
+        {msStatus === "waiting" && !deviceCode && <p className="text-xs text-text-muted">Conectando con Microsoft…</p>}
+      </section>
+
+      {/* Offline */}
+      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Cuenta sin conexión</h2>
+        <div className="flex gap-2">
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Nombre de usuario (3-16 caracteres)"
+            className="input flex-1"
+          />
+          <button onClick={handleAdd} className="rounded-md border border-border px-4 py-2 text-sm text-text hover:bg-surface-sunken">
+            Añadir
+          </button>
+        </div>
+      </section>
 
       <div className="flex flex-col gap-2">
         {accounts.length === 0 && (
@@ -71,15 +124,25 @@ export function Accounts() {
         {accounts.map((account) => (
           <div
             key={account.id}
-            className="flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3"
+            className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-4 py-3"
           >
-            <div>
-              <p className="text-sm font-medium text-text">{account.username}</p>
-              <p className="text-xs text-text-muted">{account.uuid}</p>
+            {account.skinUrl ? (
+              <img src={account.skinUrl} alt="" className="h-8 w-8 shrink-0 rounded" />
+            ) : (
+              <div className="h-8 w-8 shrink-0 rounded bg-surface-sunken" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-medium text-text">{account.username}</p>
+                <span className="shrink-0 rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                  {account.kind === "microsoft" ? "Microsoft" : "Sin conexión"}
+                </span>
+              </div>
+              <p className="truncate text-xs text-text-muted">{account.uuid}</p>
             </div>
             <button
               onClick={() => handleRemove(account.id)}
-              className="rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-sunken hover:text-red-400"
+              className="shrink-0 rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-sunken hover:text-red-400"
             >
               Cerrar sesión
             </button>

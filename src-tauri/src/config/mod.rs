@@ -4,7 +4,7 @@
 //! en el resto del código: todo se lee de aquí.
 
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 /// Valores por defecto embebidos en el binario en tiempo de compilación, para
@@ -28,6 +28,38 @@ pub struct LauncherConfig {
     pub show_snapshots: bool,
     pub instances_dir: Option<String>,
     pub java_dir: Option<String>,
+    /// Servidor precargado en la lista de multijugador de cada instancia
+    /// nueva (ver `minecraft::instance::write_default_servers_dat`). `None`
+    /// = no se agrega ninguno.
+    #[serde(default)]
+    pub default_server_name: Option<String>,
+    #[serde(default)]
+    pub default_server_address: Option<String>,
+    /// Aplica el resource pack embebido que reemplaza el panorama de la
+    /// pantalla de título del juego (no del launcher) por el banner
+    /// configurado. Ver `assets/title_resourcepack.zip`.
+    #[serde(default = "default_true")]
+    pub apply_title_screen_pack: bool,
+    /// Texto que Minecraft dibuja junto a "Minecraft <versión>" en la
+    /// esquina inferior izquierda del menú principal (el `version_type` del
+    /// lanzamiento). Separado de `launcherName` porque conviene más corto.
+    #[serde(default = "default_version_type_label")]
+    pub version_type_label: String,
+    /// "Application (client) ID" de la app registrada en Microsoft Entra
+    /// para el login real de Microsoft/Xbox. `None` = el botón de "Agregar
+    /// cuenta Microsoft" queda deshabilitado — ver README para cómo
+    /// registrar la tuya (gratis, requisito de Microsoft, no se puede
+    /// incluir un client_id genérico).
+    #[serde(default)]
+    pub microsoft_client_id: Option<String>,
+}
+
+fn default_version_type_label() -> String {
+    "PikiPiki".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl LauncherConfig {
@@ -119,19 +151,34 @@ pub fn cache_dir(app: &AppHandle) -> PathBuf {
     app_data_dir(app).join("cache")
 }
 
-// Todavía sin un comando IPC que lo exponga: la UI no renderiza logo/icono
-// como imagen en esta fase (ver "Limitaciones conocidas" en el README). Punto
-// de extensión listo para cuando se resuelva vía el protocolo `asset://`.
-#[allow(dead_code)]
-pub fn resolve_asset_path(app: &AppHandle, relative: &str) -> PathBuf {
-    // El usuario puede apuntar logo/icon a una ruta absoluta propia, o dejar
-    // la relativa por defecto que vive junto a los recursos empaquetados.
-    let p = Path::new(relative);
-    if p.is_absolute() {
-        return p.to_path_buf();
-    }
-    app.path()
-        .resource_dir()
-        .map(|r| r.join(relative))
-        .unwrap_or_else(|_| p.to_path_buf())
+// Igual que el nombre/color, estas imágenes se fijan antes de compilar, no
+// se leen en tiempo de ejecución desde una ruta configurable: se embeben en
+// el binario para no depender de la resolución de `resource_dir` (distinta
+// entre `tauri dev` y el instalador final) ni de que el archivo exista en
+// disco tal cual quedó en la máquina donde se compiló.
+const LOGO_BYTES: &[u8] = include_bytes!("../../../assets/logo.png");
+const ICON_BYTES: &[u8] = include_bytes!("../../../assets/icon.png");
+const BANNER_BYTES: &[u8] = include_bytes!("../../../assets/banner.jpg");
+
+/// Resource pack que reemplaza el panorama de la pantalla de título del
+/// juego por el banner configurado. Ver el README para cómo se generó
+/// (recorte cuadrado del banner en las 6 caras) y su limitación conocida:
+/// se ve como la misma imagen repetida, no un entorno 360° real.
+pub const TITLE_SCREEN_RESOURCE_PACK: &[u8] = include_bytes!("../../../assets/title_resourcepack.zip");
+
+fn as_data_url(mime: &str, bytes: &[u8]) -> String {
+    use base64::Engine;
+    format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+pub fn logo_data_url() -> String {
+    as_data_url("image/png", LOGO_BYTES)
+}
+
+pub fn icon_data_url() -> String {
+    as_data_url("image/png", ICON_BYTES)
+}
+
+pub fn banner_data_url() -> String {
+    as_data_url("image/jpeg", BANNER_BYTES)
 }

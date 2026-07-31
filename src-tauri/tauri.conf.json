@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MiLauncher",
+  "productName": "PIKIPIKI LAUNCHER",
   "version": "0.1.0",
   "identifier": "com.milauncher.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "MiLauncher",
+        "title": "PIKIPIKI LAUNCHER",
         "width": 1100,
         "height": 720,
         "minWidth": 900,

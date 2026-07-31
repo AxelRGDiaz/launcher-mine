@@ -1,3 +1,4 @@
+use crate::accounts::microsoft::PendingLogin;
 use crate::config::LauncherConfig;
 use crate::download::DownloadManager;
 use std::collections::HashMap;
@@ -12,6 +13,10 @@ pub struct AppState {
     /// Procesos de Minecraft en ejecución, por id de instancia, para poder
     /// leer su log en vivo o matarlos desde la UI.
     pub running_instances: RwLock<HashMap<String, RunningGame>>,
+    /// Login de Microsoft en curso (entre `start_microsoft_login` y
+    /// `complete_microsoft_login`) — solo uno a la vez, es una acción de UI
+    /// modal, no concurrente.
+    pub pending_ms_login: RwLock<Option<PendingLogin>>,
 }
 
 pub struct RunningGame {
@@ -26,7 +31,7 @@ pub struct RunningGame {
 impl AppState {
     pub fn new(config: LauncherConfig) -> Self {
         let http = reqwest::Client::builder()
-            .user_agent(concat!("MiLauncher/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("PikiPikiLauncher/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("no se pudo construir el cliente HTTP");
         Self {
@@ -34,6 +39,7 @@ impl AppState {
             downloads: DownloadManager::new(),
             http,
             running_instances: RwLock::new(HashMap::new()),
+            pending_ms_login: RwLock::new(None),
         }
     }
 }

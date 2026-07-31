@@ -41,13 +41,23 @@ export function InstanceCard({ instance, installed, running, busy, onPlay, onIns
           Eliminar
         </button>
         {installed ? (
-          <button
-            onClick={onPlay}
-            disabled={busy || running}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {running ? "Jugando…" : busy ? "Iniciando…" : "Jugar"}
-          </button>
+          <>
+            <button
+              onClick={onInstall}
+              disabled={busy || running}
+              title="Verifica y repara los archivos de esta versión sin borrar la instancia"
+              className="rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-sunken hover:text-text disabled:opacity-50"
+            >
+              Reinstalar
+            </button>
+            <button
+              onClick={onPlay}
+              disabled={busy || running}
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {running ? "Jugando…" : busy ? "Iniciando…" : "Jugar"}
+            </button>
+          </>
         ) : (
           <button
             onClick={onInstall}

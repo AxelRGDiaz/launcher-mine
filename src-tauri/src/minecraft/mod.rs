@@ -1,7 +1,10 @@
+pub mod fabric_like;
+pub mod forge_like;
 pub mod install;
 pub mod instance;
 pub mod launch;
 pub mod manifest;
+pub mod optifine;
 
 use std::path::{Path, PathBuf};
 
@@ -53,4 +56,6 @@ pub enum McError {
     Json(#[from] serde_json::Error),
     #[error("instancia no encontrada: {0}")]
     InstanceNotFound(String),
+    #[error("el instalador falló: {0}")]
+    InstallerFailed(String),
 }

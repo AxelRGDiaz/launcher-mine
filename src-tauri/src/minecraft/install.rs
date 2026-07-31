@@ -89,7 +89,7 @@ pub struct OsRule {
     pub name: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Arguments {
     #[serde(default)]
     pub game: Vec<serde_json::Value>,
@@ -254,9 +254,16 @@ async fn install_assets(
     let index: AssetIndex = serde_json::from_slice(&index_bytes)?;
     let objects_dir = paths.assets.join("objects");
 
+    // Muchos nombres virtuales distintos comparten el mismo contenido (mismo
+    // hash) — p.ej. varios idiomas sin traducir apuntando al mismo JSON. Como
+    // el destino ya está direccionado por hash, basta con encolar cada hash
+    // una sola vez (el `DownloadManager` además serializa por destino como
+    // red de seguridad, pero deduplicar aquí evita trabajo redundante).
+    let mut seen_hashes = std::collections::HashSet::new();
     let requests: Vec<DownloadRequest> = index
         .objects
         .into_iter()
+        .filter(|(_, object)| seen_hashes.insert(object.hash.clone()))
         .map(|(name, object)| {
             let hash_prefix = &object.hash[0..2];
             DownloadRequest {
@@ -274,4 +281,41 @@ async fn install_assets(
 
 pub fn is_installed(paths: &GamePaths, version_id: &str) -> bool {
     paths.versions.join(version_id).join(".installed").exists()
+}
+
+/// Fusiona un `VersionDetail` "hijo" que declara `inheritsFrom` pero no trae
+/// `assetIndex`/`downloads`/`assets` propios — el caso de Fabric, Quilt,
+/// Forge y NeoForge, todos apoyados en la versión Vanilla de la que
+/// dependen. Usado por `fabric_like` y `forge_like` para no duplicar esta
+/// lógica.
+pub fn merge_with_parent(
+    parent: &VersionDetail,
+    child_id: String,
+    child_main_class: String,
+    child_libraries: Vec<Library>,
+    child_arguments: Option<Arguments>,
+    child_legacy_arguments: Option<String>,
+) -> VersionDetail {
+    let merged_arguments = match &parent.arguments {
+        Some(parent_args) => {
+            let child_args = child_arguments.unwrap_or_default();
+            Some(Arguments {
+                game: [parent_args.game.clone(), child_args.game].concat(),
+                jvm: [parent_args.jvm.clone(), child_args.jvm].concat(),
+            })
+        }
+        None => child_arguments,
+    };
+
+    VersionDetail {
+        id: child_id,
+        main_class: child_main_class,
+        asset_index: parent.asset_index.clone(),
+        assets: parent.assets.clone(),
+        downloads: parent.downloads.clone(),
+        libraries: [parent.libraries.clone(), child_libraries].concat(),
+        java_version: parent.java_version.clone(),
+        arguments: merged_arguments,
+        legacy_arguments: child_legacy_arguments.or_else(|| parent.legacy_arguments.clone()),
+    }
 }

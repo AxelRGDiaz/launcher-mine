@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "@/lib/api";
-import type { Account, DownloadProgress, Instance, VersionEntry } from "@/lib/types";
+import type { Account, DownloadProgress, Instance, LoaderKind, LoaderVersionEntry, VersionEntry } from "@/lib/types";
 import { InstanceCard } from "@/components/InstanceCard";
 import { ProgressBar } from "@/components/ProgressBar";
+
+const CREATABLE_LOADERS: { value: LoaderKind; label: string }[] = [
+  { value: "vanilla", label: "Vanilla" },
+  { value: "fabric", label: "Fabric" },
+  { value: "quilt", label: "Quilt" },
+  { value: "forge", label: "Forge" },
+  { value: "neoforge", label: "NeoForge" },
+  { value: "optifine", label: "OptiFine" },
+];
 
 export function Instances() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [versions, setVersions] = useState<VersionEntry[]>([]);
-  const [installedVersions, setInstalledVersions] = useState<Record<string, boolean>>({});
+  const [installedInstances, setInstalledInstances] = useState<Record<string, boolean>>({});
   const [runningIds, setRunningIds] = useState<Record<string, boolean>>({});
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
@@ -19,15 +29,20 @@ export function Instances() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newVersion, setNewVersion] = useState("");
+  const [newLoader, setNewLoader] = useState<LoaderKind>("vanilla");
+  const [loaderVersions, setLoaderVersions] = useState<LoaderVersionEntry[]>([]);
+  const [newLoaderVersion, setNewLoaderVersion] = useState("");
+  const [loadingLoaderVersions, setLoadingLoaderVersions] = useState(false);
+  const [optifineImports, setOptifineImports] = useState<string[]>([]);
+  const [importingOptifine, setImportingOptifine] = useState(false);
 
   async function refreshInstances() {
     const list = await api.instances.list();
     setInstances(list);
-    const uniqueVersions = [...new Set(list.map((i) => i.minecraftVersion))];
     const entries = await Promise.all(
-      uniqueVersions.map(async (v) => [v, await api.instances.isVersionInstalled(v)] as const),
+      list.map(async (i) => [i.id, await api.instances.isInstanceInstalled(i.id)] as const),
     );
-    setInstalledVersions(Object.fromEntries(entries));
+    setInstalledInstances(Object.fromEntries(entries));
   }
 
   useEffect(() => {
@@ -50,6 +65,59 @@ export function Instances() {
       void unlistenExit.then((f) => f());
     };
   }, []);
+
+  // Fabric/Quilt/Forge/NeoForge exponen versiones de loader específicas por
+  // versión de Minecraft, así que hay que volver a pedirlas cada vez que
+  // cambia cualquiera de las dos. OptiFine no tiene API: se maneja aparte
+  // (ver el otro useEffect, contra los archivos ya importados).
+  useEffect(() => {
+    if (newLoader === "vanilla" || newLoader === "optifine" || !newVersion) {
+      setLoaderVersions([]);
+      setNewLoaderVersion("");
+      return;
+    }
+    setLoadingLoaderVersions(true);
+    void api.loaders
+      .listVersions(newVersion, newLoader)
+      .then((entries) => {
+        setLoaderVersions(entries);
+        const stable = entries.find((e) => e.stable) ?? entries[0];
+        setNewLoaderVersion(stable?.version ?? "");
+      })
+      .catch((err) => setError(String(err)))
+      .finally(() => setLoadingLoaderVersions(false));
+  }, [newLoader, newVersion]);
+
+  async function refreshOptifineImports() {
+    if (!newVersion) return;
+    const imports = await api.optifine.listImports(newVersion);
+    setOptifineImports(imports);
+    setNewLoaderVersion(imports[0] ?? "");
+  }
+
+  useEffect(() => {
+    if (newLoader === "optifine") void refreshOptifineImports();
+  }, [newLoader, newVersion]);
+
+  async function handleImportOptifine() {
+    const selected = await openFileDialog({
+      multiple: false,
+      filters: [{ name: "OptiFine", extensions: ["jar"] }],
+      title: "Selecciona el .jar de OptiFine que descargaste de optifine.net",
+    });
+    if (!selected || Array.isArray(selected)) return;
+    setImportingOptifine(true);
+    setError(null);
+    try {
+      const fileName = await api.optifine.import(selected);
+      await refreshOptifineImports();
+      setNewLoaderVersion(fileName);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setImportingOptifine(false);
+    }
+  }
 
   async function handleInstall(instance: Instance) {
     setError(null);
@@ -91,9 +159,15 @@ export function Instances() {
 
   async function handleCreate() {
     if (!newName.trim() || !newVersion) return;
+    if (newLoader !== "vanilla" && !newLoaderVersion) return;
     setError(null);
     try {
-      await api.instances.create(newName.trim(), newVersion);
+      await api.instances.create(
+        newName.trim(),
+        newVersion,
+        newLoader,
+        newLoader === "vanilla" ? null : newLoaderVersion,
+      );
       setNewName("");
       setShowCreate(false);
       await refreshInstances();
@@ -134,7 +208,7 @@ export function Instances() {
             onClick={() => setShowCreate((v) => !v)}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white"
           >
-            Nueva instancia
+            Nueva versión
           </button>
         </div>
       </div>
@@ -145,28 +219,83 @@ export function Instances() {
 
       {showCreate && (
         <div className="rounded-lg border border-border bg-surface-raised p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Nombre de la instancia"
-              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary"
+              className="input"
             />
-            <select
-              value={newVersion}
-              onChange={(e) => setNewVersion(e.target.value)}
-              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-text"
-            >
+            <select value={newLoader} onChange={(e) => setNewLoader(e.target.value as LoaderKind)} className="input">
+              {CREATABLE_LOADERS.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+            <select value={newVersion} onChange={(e) => setNewVersion(e.target.value)} className="input">
               {versions.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.id} {v.type !== "release" ? `(${v.type})` : ""}
                 </option>
               ))}
             </select>
-            <button onClick={handleCreate} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white">
-              Crear
-            </button>
+            {newLoader !== "vanilla" && newLoader !== "optifine" && (
+              <select
+                value={newLoaderVersion}
+                onChange={(e) => setNewLoaderVersion(e.target.value)}
+                disabled={loadingLoaderVersions || loaderVersions.length === 0}
+                className="input"
+              >
+                {loadingLoaderVersions && <option>Cargando versiones…</option>}
+                {!loadingLoaderVersions && loaderVersions.length === 0 && (
+                  <option>Sin versiones disponibles para {newVersion}</option>
+                )}
+                {loaderVersions.map((l) => (
+                  <option key={l.version} value={l.version}>
+                    {l.version} {l.stable ? "" : "(inestable)"}
+                  </option>
+                ))}
+              </select>
+            )}
+            {newLoader === "optifine" && (
+              <div className="flex gap-2 sm:col-span-2">
+                <select
+                  value={newLoaderVersion}
+                  onChange={(e) => setNewLoaderVersion(e.target.value)}
+                  disabled={optifineImports.length === 0}
+                  className="input flex-1"
+                >
+                  {optifineImports.length === 0 && <option>Ningún OptiFine importado para {newVersion} todavía</option>}
+                  {optifineImports.map((fileName) => (
+                    <option key={fileName} value={fileName}>
+                      {fileName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleImportOptifine}
+                  disabled={importingOptifine}
+                  className="shrink-0 rounded-md border border-border px-3 py-2 text-sm text-text hover:bg-surface-sunken disabled:opacity-50"
+                >
+                  {importingOptifine ? "Importando…" : "Importar .jar…"}
+                </button>
+              </div>
+            )}
           </div>
+          {newLoader === "optifine" && (
+            <p className="mt-2 text-xs text-text-muted">
+              Descarga el <code>.jar</code> de OptiFine para {newVersion} desde{" "}
+              <span className="text-text">optifine.net</span> tú mismo, luego impórtalo aquí. Solo hace falta una vez
+              por versión.
+            </p>
+          )}
+          <button
+            onClick={handleCreate}
+            className="mt-3 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white"
+          >
+            Crear
+          </button>
         </div>
       )}
 
@@ -186,7 +315,7 @@ export function Instances() {
           <InstanceCard
             key={instance.id}
             instance={instance}
-            installed={!!installedVersions[instance.minecraftVersion]}
+            installed={!!installedInstances[instance.id]}
             running={!!runningIds[instance.id]}
             busy={busyInstanceId === instance.id}
             onPlay={() => handlePlay(instance)}

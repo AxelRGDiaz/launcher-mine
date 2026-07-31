@@ -1,16 +1,21 @@
 {
-  "launcherName": "MiLauncher",
+  "launcherName": "PIKIPIKI LAUNCHER",
   "logoPath": "assets/logo.png",
   "iconPath": "assets/icon.png",
   "theme": "dark",
   "primaryColor": "#4CAF50",
-  "backgroundImage": null,
-  "welcomeText": "Bienvenido a MiLauncher",
+  "backgroundImage": "assets/banner.jpg",
+  "welcomeText": "Bienvenido a PIKIPIKI LAUNCHER",
   "supportUrl": "https://github.com/tu-usuario/tu-launcher",
   "defaultMinRamMb": 2048,
   "defaultMaxRamMb": 4096,
   "autoUpdateJava": true,
   "showSnapshots": false,
   "instancesDir": null,
-  "javaDir": null
+  "javaDir": null,
+  "defaultServerName": "MUNDO PIKIPIKI",
+  "defaultServerAddress": "pikipiki.axel-diaz.com",
+  "applyTitleScreenPack": true,
+  "versionTypeLabel": "PikiPiki",
+  "microsoftClientId": "b135926e-046e-44e8-a2f6-9d1cbd6f190a"
 }

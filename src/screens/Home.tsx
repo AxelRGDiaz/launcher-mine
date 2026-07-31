@@ -9,7 +9,7 @@ interface HomeProps {
 }
 
 export function Home({ onNavigate }: HomeProps) {
-  const { config } = useLauncherConfig();
+  const { config, images } = useLauncherConfig();
   const [instances, setInstances] = useState<Instance[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [installed, setInstalled] = useState(false);
@@ -26,7 +26,7 @@ export function Home({ onNavigate }: HomeProps) {
 
   useEffect(() => {
     if (primaryInstance) {
-      void api.instances.isVersionInstalled(primaryInstance.minecraftVersion).then(setInstalled);
+      void api.instances.isInstanceInstalled(primaryInstance.id).then(setInstalled);
     }
   }, [primaryInstance?.id]);
 
@@ -55,12 +55,21 @@ export function Home({ onNavigate }: HomeProps) {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 p-6 text-center">
-      <div>
-        <h1 className="text-2xl font-semibold text-text">{config?.welcomeText}</h1>
+    <div className="relative flex h-full flex-col items-center justify-center gap-6 p-6 text-center">
+      {images?.banner && (
+        <>
+          <div
+            className="absolute inset-0 -z-10 bg-cover bg-center"
+            style={{ backgroundImage: `url(${images.banner})` }}
+          />
+          <div className="absolute inset-0 -z-10 bg-black/55" />
+        </>
+      )}
+      <div className="relative">
+        <h1 className="text-2xl font-semibold text-white drop-shadow">{config?.welcomeText}</h1>
         {primaryInstance && (
-          <p className="mt-2 text-sm text-text-muted">
-            Última instancia: <span className="text-text">{primaryInstance.name}</span> ({primaryInstance.minecraftVersion})
+          <p className="mt-2 text-sm text-white/80 drop-shadow">
+            Última instancia: <span className="text-white">{primaryInstance.name}</span> ({primaryInstance.minecraftVersion})
           </p>
         )}
       </div>

@@ -16,6 +16,7 @@ pub enum LoaderKind {
     NeoForge,
     Fabric,
     Quilt,
+    Optifine,
 }
 
 impl Default for LoaderKind {
@@ -74,6 +75,9 @@ pub async fn create(
     name: &str,
     minecraft_version: &str,
     loader: LoaderKind,
+    loader_version: Option<String>,
+    default_server: Option<(&str, &str)>,
+    apply_title_screen_pack: bool,
 ) -> Result<Instance, McError> {
     let base_slug = slugify(name);
     let mut id = base_slug.clone();
@@ -88,7 +92,7 @@ pub async fn create(
         name: name.to_string(),
         minecraft_version: minecraft_version.to_string(),
         loader,
-        loader_version: None,
+        loader_version,
         min_ram_mb: None,
         max_ram_mb: None,
         extra_jvm_args: None,
@@ -97,9 +101,114 @@ pub async fn create(
         total_playtime_secs: 0,
     };
 
-    tokio::fs::create_dir_all(minecraft_dir(instances_root, &id)).await?;
+    let mc_dir = minecraft_dir(instances_root, &id);
+    tokio::fs::create_dir_all(&mc_dir).await?;
     save(instances_root, &instance).await?;
+
+    if let Some((server_name, server_address)) = default_server {
+        write_default_servers_dat(&mc_dir, server_name, server_address).await?;
+    }
+    if apply_title_screen_pack {
+        write_title_screen_pack(&mc_dir).await?;
+    }
+
     Ok(instance)
+}
+
+// ------------------------------------------------ Branding de la partida --
+// A diferencia del resto de la instancia (versión/loader/RAM), esto no es
+// funcionalidad del juego: es branding que se escribe una vez al crear la
+// instancia, dentro de su propio `.minecraft`, usando los mismos formatos
+// que el launcher oficial de Mojang (servers.dat) y el sistema estándar de
+// resource packs — nada de esto requiere un mod ni modifica el jar del juego.
+
+fn write_be_u16(buf: &mut Vec<u8>, value: u16) {
+    buf.extend_from_slice(&value.to_be_bytes());
+}
+
+fn write_be_i32(buf: &mut Vec<u8>, value: i32) {
+    buf.extend_from_slice(&value.to_be_bytes());
+}
+
+fn write_nbt_tag_header(buf: &mut Vec<u8>, tag_type: u8, name: &str) {
+    buf.push(tag_type);
+    write_be_u16(buf, name.len() as u16);
+    buf.extend_from_slice(name.as_bytes());
+}
+
+fn write_nbt_string_payload(buf: &mut Vec<u8>, value: &str) {
+    write_be_u16(buf, value.len() as u16);
+    buf.extend_from_slice(value.as_bytes());
+}
+
+/// Arma un `servers.dat` (NBT sin comprimir) con un único servidor
+/// precargado. Formato: TAG_Compound raíz sin nombre > TAG_List "servers" de
+/// TAG_Compound > tags `name`/`ip`/`acceptTextures` — el mismo que escribe el
+/// launcher oficial de Mojang.
+fn build_servers_dat(name: &str, address: &str) -> Vec<u8> {
+    const TAG_END: u8 = 0;
+    const TAG_BYTE: u8 = 1;
+    const TAG_STRING: u8 = 8;
+    const TAG_LIST: u8 = 9;
+    const TAG_COMPOUND: u8 = 10;
+
+    let mut buf = Vec::new();
+    write_nbt_tag_header(&mut buf, TAG_COMPOUND, "");
+
+    write_nbt_tag_header(&mut buf, TAG_LIST, "servers");
+    buf.push(TAG_COMPOUND);
+    write_be_i32(&mut buf, 1); // un solo servidor en la lista
+
+    write_nbt_tag_header(&mut buf, TAG_STRING, "name");
+    write_nbt_string_payload(&mut buf, name);
+    write_nbt_tag_header(&mut buf, TAG_STRING, "ip");
+    write_nbt_string_payload(&mut buf, address);
+    write_nbt_tag_header(&mut buf, TAG_BYTE, "acceptTextures");
+    buf.push(1); // acepta el resource pack del servidor sin preguntar cada vez
+    buf.push(TAG_END); // cierra el compound del servidor
+
+    buf.push(TAG_END); // cierra el compound raíz
+    buf
+}
+
+async fn write_default_servers_dat(minecraft_dir: &Path, name: &str, address: &str) -> Result<(), McError> {
+    let path = minecraft_dir.join("servers.dat");
+    if path.exists() {
+        return Ok(()); // no pisar una lista que el jugador ya haya editado
+    }
+    tokio::fs::write(path, build_servers_dat(name, address)).await?;
+    Ok(())
+}
+
+/// Copia el resource pack embebido (panorama de título personalizado) a la
+/// instancia y lo activa en `options.txt`. Limitación conocida: como el
+/// panorama real del juego es un entorno 3D de 6 caras y el pack solo pone
+/// una imagen recortada repetida, se ve como "la imagen de fondo repetida al
+/// girar la cámara", no como un ambiente continuo — es una decisión de
+/// diseño, no un bug.
+async fn write_title_screen_pack(minecraft_dir: &Path) -> Result<(), McError> {
+    let resourcepacks_dir = minecraft_dir.join("resourcepacks");
+    tokio::fs::create_dir_all(&resourcepacks_dir).await?;
+    tokio::fs::write(
+        resourcepacks_dir.join("title_resourcepack.zip"),
+        crate::config::TITLE_SCREEN_RESOURCE_PACK,
+    )
+    .await?;
+
+    let options_path = minecraft_dir.join("options.txt");
+    let mut lines: Vec<String> = if options_path.exists() {
+        tokio::fs::read_to_string(&options_path)
+            .await?
+            .lines()
+            .map(str::to_string)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    lines.retain(|line| !line.starts_with("resourcePacks:"));
+    lines.push(r#"resourcePacks:["vanilla","file/title_resourcepack.zip"]"#.to_string());
+    tokio::fs::write(&options_path, lines.join("\n") + "\n").await?;
+    Ok(())
 }
 
 pub async fn save(instances_root: &Path, instance: &Instance) -> Result<(), McError> {

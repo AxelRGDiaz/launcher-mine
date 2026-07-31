@@ -1,4 +1,5 @@
 import type { LauncherConfig } from "@/lib/types";
+import { useLauncherConfig } from "@/theme/ThemeProvider";
 
 export type ScreenId = "home" | "instances" | "mods" | "accounts" | "settings" | "about";
 
@@ -18,6 +19,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ active, onNavigate, config }: SidebarProps) {
+  const { images } = useLauncherConfig();
   const initials = config.launcherName
     .split(/\s+/)
     .map((word) => word[0])
@@ -28,12 +30,16 @@ export function Sidebar({ active, onNavigate, config }: SidebarProps) {
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-surface-sunken">
       <div className="flex items-center gap-3 px-4 py-5">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white"
-          style={{ backgroundColor: config.primaryColor }}
-        >
-          {initials || "ML"}
-        </div>
+        {images?.logo ? (
+          <img src={images.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
+            style={{ backgroundColor: config.primaryColor }}
+          >
+            {initials || "ML"}
+          </div>
+        )}
         <span className="truncate text-sm font-semibold text-text">{config.launcherName}</span>
       </div>
 

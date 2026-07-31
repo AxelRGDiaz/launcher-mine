@@ -2,10 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   Account,
+  BrandingImages,
+  DeviceCodeInfo,
   DownloadProgress,
   Instance,
   JavaInstallation,
   LauncherConfig,
+  LoaderKind,
+  LoaderVersionEntry,
   ModEntry,
   VersionEntry,
 } from "./types";
@@ -18,6 +22,10 @@ export const api = {
     get: () => invoke<LauncherConfig>("get_config"),
     save: (config: LauncherConfig) => invoke<LauncherConfig>("save_config", { config }),
     reset: () => invoke<LauncherConfig>("reset_config"),
+  },
+
+  branding: {
+    images: () => invoke<BrandingImages>("get_branding_images"),
   },
 
   system: {
@@ -35,16 +43,26 @@ export const api = {
 
   instances: {
     list: () => invoke<Instance[]>("list_instances"),
-    create: (name: string, minecraftVersion: string) =>
-      invoke<Instance>("create_instance", { name, minecraftVersion }),
+    create: (name: string, minecraftVersion: string, loader: LoaderKind, loaderVersion: string | null) =>
+      invoke<Instance>("create_instance", { name, minecraftVersion, loader, loaderVersion }),
     update: (instance: Instance) => invoke<void>("update_instance", { instance }),
     delete: (instanceId: string) => invoke<void>("delete_instance", { instanceId }),
-    isVersionInstalled: (minecraftVersion: string) =>
-      invoke<boolean>("is_version_installed", { minecraftVersion }),
+    isInstanceInstalled: (instanceId: string) => invoke<boolean>("is_instance_installed", { instanceId }),
     install: (instanceId: string) => invoke<void>("install_instance", { instanceId }),
     launch: (instanceId: string, accountId: string) =>
       invoke<void>("launch_instance", { instanceId, accountId }),
     isRunning: (instanceId: string) => invoke<boolean>("is_instance_running", { instanceId }),
+  },
+
+  loaders: {
+    listVersions: (minecraftVersion: string, loader: LoaderKind) =>
+      invoke<LoaderVersionEntry[]>("list_loader_versions", { minecraftVersion, loader }),
+  },
+
+  optifine: {
+    /** `sourcePath` viene del diálogo nativo de selección de archivo. */
+    import: (sourcePath: string) => invoke<string>("import_optifine", { sourcePath }),
+    listImports: (minecraftVersion: string) => invoke<string[]>("list_optifine_imports", { minecraftVersion }),
   },
 
   mods: {
@@ -57,6 +75,8 @@ export const api = {
     list: () => invoke<Account[]>("list_accounts"),
     add: (username: string) => invoke<Account>("add_account", { username }),
     remove: (accountId: string) => invoke<void>("remove_account", { accountId }),
+    startMicrosoftLogin: () => invoke<DeviceCodeInfo>("start_microsoft_login"),
+    completeMicrosoftLogin: () => invoke<Account>("complete_microsoft_login"),
   },
 
   events: {

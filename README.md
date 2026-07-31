@@ -1,4 +1,4 @@
-# MiLauncher
+# PIKIPIKI LAUNCHER
 
 Launcher de Minecraft ligero, personalizable y sin telemetría, construido con
 **Tauri v2 + Rust + React/TypeScript**. Este repositorio es la **Fase 1**: un
@@ -138,26 +138,39 @@ instalada:
 ```jsonc
 // config/config.default.json
 {
-  "launcherName": "MiLauncher",      // nombre visible en toda la UI y el título de ventana
-  "logoPath": "assets/logo.png",     // reservado para cuando se resuelva a asset:// (ver Limitaciones)
-  "iconPath": "assets/icon.png",     // idem
+  "launcherName": "PIKIPIKI LAUNCHER", // nombre visible en toda la UI y el título de ventana
+  "logoPath": "assets/logo.png",     // informativo — la imagen real se embebe desde este archivo al compilar
+  "iconPath": "assets/icon.png",     // idem, más el ícono de la app en src-tauri/icons/ (ver npx tauri icon)
   "theme": "dark",                   // "dark" | "light" — el usuario SÍ puede cambiar esto en Configuración
   "primaryColor": "#4CAF50",         // color de acento en toda la UI
-  "backgroundImage": null,           // reservado para tema custom
-  "welcomeText": "Bienvenido a MiLauncher",
+  "backgroundImage": "assets/banner.jpg", // informativo, ídem — fondo de la pantalla de Inicio
+  "welcomeText": "Bienvenido a PIKIPIKI LAUNCHER",
   "supportUrl": "https://github.com/tu-usuario/tu-launcher",
   "defaultMinRamMb": 2048,
   "defaultMaxRamMb": 4096,
   "autoUpdateJava": true,            // reservado: hoy la instalación de Java es manual desde Configuración
   "showSnapshots": false,            // el usuario SÍ puede cambiar esto en Configuración
   "instancesDir": null,              // null = carpeta por defecto en app_data_dir
-  "javaDir": null                    // idem, para el runtime de Java gestionado
+  "javaDir": null,                   // idem, para el runtime de Java gestionado
+  "defaultServerName": "MUNDO PIKIPIKI",       // servidor precargado en cada instancia nueva, o null
+  "defaultServerAddress": "pikipiki.axel-diaz.com",
+  "applyTitleScreenPack": true,       // fondo/logo personalizados en el menú del juego (no del launcher)
+  "versionTypeLabel": "PikiPiki",     // texto junto a "Minecraft <versión>" en ese mismo menú
+  "microsoftClientId": null           // tu "Application (client) ID" de Microsoft Entra — ver más abajo
 }
 ```
 
 Después de editar cualquiera de los dos archivos, recompila
 (`npm run tauri:build` o el workflow de CI) para que el cambio quede en el
 instalador.
+
+**Logo, ícono y fondo son imágenes reales**, no solo texto: `assets/logo.png`
+(barra lateral), `assets/icon.png` (referencia) y `assets/banner.jpg` (fondo
+de Inicio) se embeben directo en el binario en tiempo de compilación
+(`include_bytes!` en `src-tauri/src/config/mod.rs`) — para cambiarlas,
+reemplaza esos tres archivos y recompila. El ícono real de la app
+(dock/taskbar/instalador) es aparte: `src-tauri/icons/*`, generado con
+`npx tauri icon assets/icon.png`.
 
 **Qué sí queda editable en caliente, ya con la app instalada:** tema
 oscuro/claro, mostrar snapshots, RAM por defecto y argumentos JVM por
@@ -169,6 +182,8 @@ del launcher.
 
 - **Config sin hardcodear**: branding completo editable antes de compilar (ver
   [Personalización](#personalización--antes-de-compilar)), sin tocar código fuente.
+  Incluye imágenes reales: logo en la barra lateral y fondo en la pantalla de
+  Inicio, no solo texto/color.
 - **Java**: detección real (PATH, `JAVA_HOME`, rutas típicas por SO, registro
   de Windows) ejecutando `java -XshowSettings:properties -version` y
   parseando la salida real — no asume nada por la ruta. Si no hay un Java 8,
@@ -178,12 +193,39 @@ del launcher.
   librerías (con las reglas por SO del JSON oficial) y assets, **todo
   verificado por SHA1**. Las descargas son reanudables (HTTP `Range`) y usan
   caché de contenido por hash.
+- **Cuentas Microsoft reales**: device code flow + Xbox Live + XSTS +
+  Minecraft Services, con renovación automática de sesión vía refresh token
+  (no hay que volver a iniciar sesión cada hora). Ver
+  [Cuentas: Microsoft real + offline](#cuentas-microsoft-real--offline) para
+  cómo registrar tu propia app.
 - **Lanzamiento real**: construye el classpath, extrae los natives que
   corresponden al SO, resuelve los argumentos JVM/juego (soporta tanto el
   formato moderno `arguments.{jvm,game}` de 1.13+ como el legado
   `minecraftArguments` de versiones viejas) y hace `spawn` del proceso Java de
   verdad, con logs en vivo en el backend (persistidos en
   `instances/<id>/logs/`).
+- **Fabric / Quilt**: se instalan leyendo su API "meta" (JSON ya resuelto,
+  verificado contra las respuestas reales de `meta.fabricmc.net`/
+  `meta.quiltmc.org`) y fusionando con la versión Vanilla de la que dependen
+  (`inheritsFrom`) — nada que ejecutar, solo descargar y fusionar JSON.
+- **Forge / NeoForge**: se descarga el instalador oficial desde el
+  repositorio Maven público de cada proyecto y se ejecuta
+  (`java -jar forge-installer.jar --installClient <dir>`), apuntando al
+  mismo directorio compartido de librerías/versiones — no se reimplementa su
+  lógica de parcheo binario del client.jar. Ver la nota ética/legal más abajo,
+  es importante.
+- **OptiFine**: importación manual — el usuario descarga el `.jar` él mismo
+  desde optifine.net (su licencia es más restrictiva que la de Forge con la
+  redistribución, así que no hay descarga automática ni la habrá) y lo
+  importa una vez desde el launcher. A partir de ahí, instalar solo corre
+  `java -jar <archivo importado>` (la ventana normal del instalador de
+  OptiFine) y el launcher detecta qué versión nueva quedó en el
+  `.minecraft` del sistema para copiarla a su estructura compartida — **sin
+  parsear nada específico del formato interno de OptiFine**, precisamente
+  porque no se verificó ese formato contra un archivo real (a diferencia de
+  Forge). Es la implementación más nueva y menos probada de las cuatro;
+  si algo falla, lo más útil es el mensaje de error exacto + qué versión de
+  Minecraft y de OptiFine se intentó instalar.
 - **Instancias**: cada una tiene su propia carpeta `minecraft/` (saves, mods,
   resourcepacks, config) y su propia RAM/argumentos JVM opcionales; comparten
   librerías/assets/versiones globalmente.
@@ -193,47 +235,80 @@ del launcher.
 - **Rendimiento**: sliders de RAM mín/máx con detección real de memoria del
   sistema (`sysinfo`) y aviso si se asigna más del 75% de la RAM total.
 
-### Nota legal/técnica sobre las cuentas en esta fase
+### Nota ética/legal sobre Forge/NeoForge
 
-Sin autenticación de Microsoft todavía, el lanzamiento usa una cuenta
-**"offline"**: mismo UUID determinista que calcula el propio cliente de
-Minecraft (`UUID.nameUUIDFromBytes("OfflinePlayer:" + nombre)`), sin token de
-sesión real. **No es un bypass ni un crack** — es el mismo modo "cuenta sin
+El propio `install_profile.json` que trae el instalador oficial de Forge
+incluye este comentario textual: *"Please do not automate the download and
+installation of Forge. Our efforts are supported by ads from the download
+page."* Confirmado leyendo un instalador real antes de programar esto, no es
+un rumor. No hay forma de automatizar la instalación de Forge respetando
+eso al pie de la letra — la práctica estándar entre launchers de código
+abierto (MultiMC, Prism Launcher, ATLauncher) es descargar desde el
+repositorio Maven público de Forge en vez de la página con anuncios
+(`files.minecraftforge.net`), que es exactamente lo que hace este launcher
+también. Es una tensión real con lo que pide el mantenedor del proyecto
+(LexManos), no una zona gris resuelta: si vas a distribuir este launcher,
+deberías saber que ese desacuerdo existe y decidir tú si te parece aceptable
+antes de publicarlo ampliamente.
+
+Además, el instalador exige que el directorio destino tenga un
+`launcher_profiles.json` (revisa que "parezca" un `.minecraft` real, creado
+por el launcher oficial de Mojang) — se crea uno mínimo sintético
+automáticamente si no existe, mismo workaround que usan MultiMC/Prism.
+
+### Cuentas: Microsoft real + offline
+
+**Microsoft real** ya está implementado: device code flow (OAuth2 del
+Microsoft identity platform) → Xbox Live → XSTS → Minecraft Services → perfil
+real (UUID, nombre, skin) — el mismo flujo que usa el launcher oficial y
+MultiMC/Prism. El `client_id` viene de `microsoftClientId` en la config, no
+está hardcodeado: cada quien despliegue este launcher necesita registrar su
+propia app en **Microsoft Entra** (gratis, requisito de Microsoft, no se
+puede evitar ni incluir uno genérico). Pasos:
+
+1. [entra.microsoft.com](https://entra.microsoft.com) → **App registrations**
+   → **New registration**
+2. "Supported account types": cuentas personales de Microsoft (o "cualquier
+   inquilino + cuentas personales", también sirve)
+3. "Redirect URI": tipo **Public client/native (mobile & desktop)**, valor
+   `https://login.microsoftonline.com/common/oauth2/nativeclient`
+4. Copia el **Application (client) ID** a `microsoftClientId` en
+   `config/config.default.json`
+
+Nota si el portal de Azure/Entra da un error de "cuenta no existe en el
+tenant" (pasa con algunas cuentas personales que nunca tuvieron un tenant
+provisionado): registra tu cuenta gratis en el
+[Microsoft 365 Developer Program](https://developer.microsoft.com/microsoft-365/dev-program)
+primero (no pide tarjeta), eso crea el tenant que falta.
+
+**Cuenta infantil bajo un grupo familiar** (el caso típico de alumnos de
+primaria): Xbox Live puede rechazar el login hasta que un adulto la agregue a
+un grupo familiar en account.microsoft.com/family — el launcher ya muestra
+ese mensaje específico si pasa, en vez de un error genérico.
+
+**Offline**: sigue disponible como modo aparte, sin cambios — mismo UUID
+determinista que calcula el propio cliente de Minecraft
+(`UUID.nameUUIDFromBytes("OfflinePlayer:" + nombre)`), sin token de sesión
+real. **No es un bypass ni un crack** — es el mismo modo "cuenta sin
 conexión" que ofrecen MultiMC/Prism Launcher para pruebas en un solo jugador
-con una copia ya poseída. El multijugador y Realms los valida el propio
-servidor de Mojang/Xbox del lado remoto, así que este modo no permite (ni lo
-intenta) jugar online sin una cuenta de Microsoft real.
+con una copia ya poseída.
 
 ## Limitaciones conocidas de esta fase
 
-- El logo/icono configurables (`logoPath`/`iconPath`) todavía no se renderizan
-  como imagen en la UI (la barra lateral muestra un monograma con las
-  iniciales sobre el color primario). Falta exponer la ruta resuelta vía el
-  protocolo `asset://` de Tauri — extensión pequeña y directa sobre
-  `theme/ThemeProvider.tsx`.
-- El backend no se ha compilado en esta sesión (ver "Requisitos para
-  desarrollar" arriba).
+- El orden de las versiones de Forge/NeoForge en el selector es un
+  heurístico (se invierte el orden de publicación del `maven-metadata.xml`),
+  no una garantía estricta de "más nueva primero" — Fabric/Quilt sí lo
+  garantizan porque su API sí expone esa información.
+- Java para correr el instalador de Forge/NeoForge se elige con la misma
+  lógica que para lanzar el juego (mismo major requerido); no se ha probado
+  contra versiones muy viejas de Forge (pre-1.13) que podrían preferir un
+  JRE distinto para el instalador que para el propio juego.
 
 ## Roadmap — qué falta
 
 Fuera de alcance de esta fase **por diseño**, con la razón técnica/legal de
 cada una:
 
-- **Autenticación Microsoft real** (device code flow + Xbox Live / XSTS /
-  Minecraft Services): requiere que registres tu propia app en
-  [Azure AD](https://portal.azure.com) (gratis) para obtener un `client_id` —
-  es un requisito de Microsoft, no algo que un launcher de terceros pueda
-  incluir de forma genérica. El módulo `accounts/` ya tiene el tipo `Account`
-  listo para añadir `AccountKind::Microsoft` sin tocar `minecraft/launch.rs`.
-- **Fabric / Quilt**: sus APIs "meta" son JSON simple y documentado — próxima
-  pieza más sencilla de añadir sobre `minecraft/install.rs`.
-- **Forge / NeoForge**: la forma correcta (la que usan MultiMC/Prism) es
-  descargar el instalador oficial firmado y ejecutarlo
-  (`java -jar forge-installer.jar --installClient`), no reimplementar su
-  lógica de parcheo.
-- **OptiFine**: su licencia prohíbe el scraping/redistribución automatizada.
-  Se implementará como *importación manual* del `.jar` que el usuario
-  descarga él mismo desde optifine.net — igual que MultiMC/Prism.
 - **Modpacks** `.mrpack` (spec abierta de Modrinth, fácil) y `.zip` estilo
   CurseForge (el `manifest.json` es legible, pero descargar los mods vía API
   de CurseForge exige que tú obtengas tu propia API key aprobada — CurseForge

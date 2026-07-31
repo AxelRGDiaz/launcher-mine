@@ -5,3 +5,15 @@ src-tauri/gen/
 *.log
 .DS_Store
 .claude/
+
+# Originales de arte en alta resolución (varios MB c/u) y experimentos de
+# banner descartados — las versiones ya redimensionadas/optimizadas que usa
+# el launcher viven en assets/ (logo.png, icon.png, banner.jpg).
+/app_icon.png
+/server_icon.png
+/banner.png
+/PIKIPIKI.png
+/banner-2.png
+/banner-3.png
+assets/app_icon.png
+assets/server_icon.png

@@ -5,7 +5,11 @@ import type { JavaInstallation } from "@/lib/types";
 import { RamSlider } from "@/components/RamSlider";
 import { ProgressBar } from "@/components/ProgressBar";
 
-const JAVA_MAJORS = [8, 17, 21];
+const JAVA_MAJORS: { major: number; hint: string }[] = [
+  { major: 8, hint: "Minecraft 1.16 y anteriores" },
+  { major: 17, hint: "Minecraft 1.17 – 1.20.4" },
+  { major: 21, hint: "Minecraft 1.20.5 y superior" },
+];
 
 export function Settings() {
   const { config, updateConfig, reload } = useLauncherConfig();
@@ -139,6 +143,52 @@ export function Settings() {
         />
       </section>
 
+      {/* Servidor por defecto */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Servidor por defecto</h2>
+        <p className="text-xs text-text-muted">
+          Se agrega automáticamente a la lista de multijugador de cada instancia nueva. Deja el nombre vacío para no
+          agregar ninguno.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Nombre del servidor">
+            <input
+              value={draft.defaultServerName ?? ""}
+              onChange={(e) => setDraft({ ...draft, defaultServerName: e.target.value || null })}
+              placeholder="MUNDO PIKIPIKI"
+              className="input"
+            />
+          </Field>
+          <Field label="Dirección">
+            <input
+              value={draft.defaultServerAddress ?? ""}
+              onChange={(e) => setDraft({ ...draft, defaultServerAddress: e.target.value || null })}
+              placeholder="pikipiki.axel-diaz.com"
+              className="input"
+            />
+          </Field>
+          <Field label="Fondo del menú del juego" full>
+            <label className="flex h-9 items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={draft.applyTitleScreenPack}
+                onChange={(e) => setDraft({ ...draft, applyTitleScreenPack: e.target.checked })}
+                className="h-4 w-4 accent-[var(--color-primary)]"
+              />
+              Reemplazar el panorama de la pantalla de título del juego por el banner configurado
+            </label>
+          </Field>
+          <Field label="Texto junto a la versión en el menú del juego">
+            <input
+              value={draft.versionTypeLabel}
+              onChange={(e) => setDraft({ ...draft, versionTypeLabel: e.target.value })}
+              placeholder="PikiPiki"
+              className="input"
+            />
+          </Field>
+        </div>
+      </section>
+
       {/* Java */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Java</h2>
@@ -158,16 +208,18 @@ export function Settings() {
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {JAVA_MAJORS.map((major) => (
-            <button
-              key={major}
-              onClick={() => handleInstallJava(major)}
-              disabled={installingMajor !== null}
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-raised disabled:opacity-50"
-            >
-              {installingMajor === major ? "Instalando…" : `Instalar Java ${major} (Temurin)`}
-            </button>
+        <div className="flex flex-wrap gap-3">
+          {JAVA_MAJORS.map(({ major, hint }) => (
+            <div key={major} className="flex flex-col items-start gap-1">
+              <button
+                onClick={() => handleInstallJava(major)}
+                disabled={installingMajor !== null}
+                className="rounded-md border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-raised disabled:opacity-50"
+              >
+                {installingMajor === major ? "Instalando…" : `Instalar Java ${major} (Temurin)`}
+              </button>
+              <span className="text-xs text-text-muted">{hint}</span>
+            </div>
           ))}
         </div>
         {installingMajor !== null && (

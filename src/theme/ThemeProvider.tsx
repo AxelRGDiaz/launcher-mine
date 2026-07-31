@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import type { LauncherConfig } from "@/lib/types";
+import type { BrandingImages, LauncherConfig } from "@/lib/types";
 
 /**
  * Paletas base por tema. Deben mantenerse en sincronía con
@@ -30,6 +30,7 @@ const THEME_PALETTES: Record<"dark" | "light", Record<string, string>> = {
 
 interface ThemeContextValue {
   config: LauncherConfig | null;
+  images: BrandingImages | null;
   loading: boolean;
   reload: () => Promise<void>;
   updateConfig: (next: LauncherConfig) => Promise<void>;
@@ -53,6 +54,7 @@ function applyCssVariables(config: LauncherConfig) {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<LauncherConfig | null>(null);
+  const [images, setImages] = useState<BrandingImages | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -74,9 +76,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void reload();
+    // Las imágenes están embebidas en el binario, no cambian en runtime —
+    // basta con pedirlas una vez.
+    void api.branding.images().then(setImages);
   }, [reload]);
 
-  const value = useMemo(() => ({ config, loading, reload, updateConfig }), [config, loading, reload, updateConfig]);
+  const value = useMemo(
+    () => ({ config, images, loading, reload, updateConfig }),
+    [config, images, loading, reload, updateConfig],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

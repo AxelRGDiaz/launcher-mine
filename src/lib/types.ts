@@ -13,6 +13,11 @@ export interface LauncherConfig {
   showSnapshots: boolean;
   instancesDir: string | null;
   javaDir: string | null;
+  defaultServerName: string | null;
+  defaultServerAddress: string | null;
+  applyTitleScreenPack: boolean;
+  versionTypeLabel: string;
+  microsoftClientId: string | null;
 }
 
 export interface JavaInstallation {
@@ -33,7 +38,12 @@ export interface VersionEntry {
   releaseTime: string;
 }
 
-export type LoaderKind = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt";
+export type LoaderKind = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt" | "optifine";
+
+export interface LoaderVersionEntry {
+  version: string;
+  stable: boolean;
+}
 
 export interface Instance {
   id: string;
@@ -49,7 +59,7 @@ export interface Instance {
   totalPlaytimeSecs: number;
 }
 
-export type AccountKind = "offline";
+export type AccountKind = "offline" | "microsoft";
 
 export interface Account {
   id: string;
@@ -58,6 +68,23 @@ export interface Account {
   uuid: string;
   accessToken: string;
   skinUrl: string | null;
+  refreshToken?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface DeviceCodeInfo {
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
+/** Data URLs (`data:image/...;base64,...`) — las imágenes van embebidas en
+ * el binario en tiempo de compilación, ver `config/mod.rs`. */
+export interface BrandingImages {
+  logo: string;
+  icon: string;
+  banner: string;
 }
 
 export interface ModEntry {

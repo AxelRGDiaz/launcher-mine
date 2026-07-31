@@ -70,7 +70,7 @@ async fn fetch_latest_asset(client: &reqwest::Client, major: u32) -> Result<Adop
     );
     let assets: Vec<AdoptiumAsset> = client
         .get(&url)
-        .header("User-Agent", concat!("MiLauncher/", env!("CARGO_PKG_VERSION")))
+        .header("User-Agent", concat!("PikiPikiLauncher/", env!("CARGO_PKG_VERSION")))
         .send()
         .await?
         .error_for_status()?

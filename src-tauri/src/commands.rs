@@ -7,7 +7,11 @@ use crate::accounts::{self, Account};
 use crate::config::{self, LauncherConfig};
 use crate::download::DownloadProgress;
 use crate::java::{self, JavaInstallation};
-use crate::minecraft::{install as mc_install, instance as mc_instance, launch as mc_launch, manifest, GamePaths};
+use crate::minecraft::install::VersionDetail;
+use crate::minecraft::{
+    fabric_like, forge_like, install as mc_install, instance as mc_instance, launch as mc_launch, manifest, optifine,
+    GamePaths,
+};
 use crate::state::{AppState, RunningGame};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -25,11 +29,65 @@ fn game_paths(app: &AppHandle, cfg: &LauncherConfig) -> GamePaths {
     GamePaths::new(&app_data, &instances, &cache)
 }
 
+fn flavor_for(loader: mc_instance::LoaderKind) -> Result<fabric_like::LoaderFlavor, String> {
+    match loader {
+        mc_instance::LoaderKind::Fabric => Ok(fabric_like::LoaderFlavor::Fabric),
+        mc_instance::LoaderKind::Quilt => Ok(fabric_like::LoaderFlavor::Quilt),
+        other => Err(format!("{other:?} no es Fabric/Quilt")),
+    }
+}
+
+fn forge_flavor_for(loader: mc_instance::LoaderKind) -> Result<forge_like::ForgeFlavor, String> {
+    match loader {
+        mc_instance::LoaderKind::Forge => Ok(forge_like::ForgeFlavor::Forge),
+        mc_instance::LoaderKind::NeoForge => Ok(forge_like::ForgeFlavor::NeoForge),
+        other => Err(format!("{other:?} no es Forge/NeoForge")),
+    }
+}
+
+/// Resuelve el Java requerido por la versión de Minecraft (no por el
+/// loader): usado tanto para lanzar el juego como para correr el
+/// instalador de Forge/NeoForge, que necesita un JRE igualmente.
+async fn required_java_for(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    cfg: &LauncherConfig,
+    paths: &GamePaths,
+    minecraft_version: &str,
+) -> Result<java::JavaInstallation, String> {
+    let parent_detail = mc_install::load_version_detail(&state.http, paths, minecraft_version, &paths.cache)
+        .await
+        .map_err(to_err)?;
+    let required_major = parent_detail.java_version.as_ref().map(|j| j.major_version).unwrap_or(17);
+    let managed_dir = config::java_runtime_dir(app, cfg);
+    let installations = java::detect_installations(&managed_dir).await;
+    java::find_best(&installations, required_major).cloned().ok_or_else(|| {
+        format!("No hay un Java {required_major}+ instalado. Ve a Configuración > Java para instalarlo.")
+    })
+}
+
 // ---------------------------------------------------------------- Config --
 
 #[tauri::command]
 pub fn get_config(state: State<AppState>) -> LauncherConfig {
     state.config.read().unwrap().clone()
+}
+
+#[tauri::command]
+pub fn get_branding_images() -> BrandingImages {
+    BrandingImages {
+        logo: config::logo_data_url(),
+        icon: config::icon_data_url(),
+        banner: config::banner_data_url(),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrandingImages {
+    pub logo: String,
+    pub icon: String,
+    pub banner: String,
 }
 
 #[tauri::command]
@@ -113,12 +171,72 @@ pub async fn create_instance(
     state: State<'_, AppState>,
     name: String,
     minecraft_version: String,
+    loader: mc_instance::LoaderKind,
+    loader_version: Option<String>,
 ) -> Result<mc_instance::Instance, String> {
     let cfg = state.config.read().unwrap().clone();
     let instances_dir = config::instances_dir(&app, &cfg);
-    mc_instance::create(&instances_dir, &name, &minecraft_version, mc_instance::LoaderKind::Vanilla)
+    let default_server = match (&cfg.default_server_name, &cfg.default_server_address) {
+        (Some(name), Some(address)) => Some((name.as_str(), address.as_str())),
+        _ => None,
+    };
+    mc_instance::create(
+        &instances_dir,
+        &name,
+        &minecraft_version,
+        loader,
+        loader_version,
+        default_server,
+        cfg.apply_title_screen_pack,
+    )
+    .await
+        .map_err(to_err)
+}
+
+#[tauri::command]
+pub async fn list_loader_versions(
+    state: State<'_, AppState>,
+    minecraft_version: String,
+    loader: mc_instance::LoaderKind,
+) -> Result<Vec<fabric_like::LoaderVersionEntry>, String> {
+    match loader {
+        mc_instance::LoaderKind::Fabric | mc_instance::LoaderKind::Quilt => {
+            let flavor = flavor_for(loader)?;
+            fabric_like::list_loader_versions(&state.http, flavor, &minecraft_version)
+                .await
+                .map_err(to_err)
+        }
+        mc_instance::LoaderKind::Forge | mc_instance::LoaderKind::NeoForge => {
+            let flavor = forge_flavor_for(loader)?;
+            let versions = forge_like::list_versions(&state.http, flavor, &minecraft_version)
+                .await
+                .map_err(to_err)?;
+            Ok(versions
+                .into_iter()
+                .map(|version| {
+                    let stable = !version.contains("beta") && !version.contains("pre");
+                    fabric_like::LoaderVersionEntry { version, stable }
+                })
+                .collect())
+        }
+        mc_instance::LoaderKind::Vanilla | mc_instance::LoaderKind::Optifine => Ok(Vec::new()),
+    }
+}
+
+// --------------------------------------------------------------- OptiFine --
+
+#[tauri::command]
+pub async fn import_optifine(app: AppHandle, source_path: String) -> Result<String, String> {
+    let app_data = config::app_data_dir(&app);
+    optifine::import_file(&app_data, std::path::Path::new(&source_path))
         .await
         .map_err(to_err)
+}
+
+#[tauri::command]
+pub async fn list_optifine_imports(app: AppHandle, minecraft_version: String) -> Result<Vec<String>, String> {
+    let app_data = config::app_data_dir(&app);
+    optifine::list_imports(&app_data, &minecraft_version).await.map_err(to_err)
 }
 
 #[tauri::command]
@@ -136,14 +254,84 @@ pub async fn update_instance(
 pub async fn delete_instance(app: AppHandle, state: State<'_, AppState>, instance_id: String) -> Result<(), String> {
     let cfg = state.config.read().unwrap().clone();
     let instances_dir = config::instances_dir(&app, &cfg);
-    mc_instance::delete(&instances_dir, &instance_id).await.map_err(to_err)
+    let paths = game_paths(&app, &cfg);
+
+    let deleted = mc_instance::load(&instances_dir, &instance_id).await.map_err(to_err)?;
+    mc_instance::delete(&instances_dir, &instance_id).await.map_err(to_err)?;
+
+    // Las librerías/assets/versiones se comparten entre instancias a
+    // propósito (ver GamePaths) — pero eso significa que borrar la última
+    // instancia que usaba una versión concreta no las limpia solo, y una
+    // instancia nueva de esa misma versión aparecería "ya instalada" sin
+    // haber descargado nada. Si ya nadie más la usa, sí la limpiamos.
+    let remaining = mc_instance::list(&instances_dir).await.map_err(to_err)?;
+
+    let mc_version_still_used = remaining.iter().any(|i| i.minecraft_version == deleted.minecraft_version);
+    if !mc_version_still_used {
+        let _ = tokio::fs::remove_dir_all(paths.versions.join(&deleted.minecraft_version)).await;
+    }
+
+    if deleted.loader != mc_instance::LoaderKind::Vanilla {
+        let same_loader_still_used = remaining.iter().any(|i| {
+            i.minecraft_version == deleted.minecraft_version
+                && i.loader == deleted.loader
+                && i.loader_version == deleted.loader_version
+        });
+        if !same_loader_still_used {
+            if let Some(loader_version) = &deleted.loader_version {
+                match deleted.loader {
+                    mc_instance::LoaderKind::Fabric | mc_instance::LoaderKind::Quilt => {
+                        if let Ok(flavor) = flavor_for(deleted.loader) {
+                            fabric_like::forget_installation(&paths, flavor, &deleted.minecraft_version, loader_version)
+                                .await;
+                        }
+                    }
+                    mc_instance::LoaderKind::Forge | mc_instance::LoaderKind::NeoForge => {
+                        if let Ok(flavor) = forge_flavor_for(deleted.loader) {
+                            forge_like::forget_installation(&paths, flavor, &deleted.minecraft_version, loader_version)
+                                .await;
+                        }
+                    }
+                    mc_instance::LoaderKind::Optifine => {
+                        optifine::forget_installation(&paths, &deleted.minecraft_version, loader_version).await;
+                    }
+                    mc_instance::LoaderKind::Vanilla => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
-pub fn is_version_installed(app: AppHandle, state: State<AppState>, minecraft_version: String) -> bool {
+pub async fn is_instance_installed(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<bool, String> {
     let cfg = state.config.read().unwrap().clone();
+    let instances_dir = config::instances_dir(&app, &cfg);
+    let instance = mc_instance::load(&instances_dir, &instance_id).await.map_err(to_err)?;
     let paths = game_paths(&app, &cfg);
-    mc_install::is_installed(&paths, &minecraft_version)
+
+    Ok(match instance.loader {
+        mc_instance::LoaderKind::Vanilla => mc_install::is_installed(&paths, &instance.minecraft_version),
+        mc_instance::LoaderKind::Fabric | mc_instance::LoaderKind::Quilt => {
+            let flavor = flavor_for(instance.loader)?;
+            let loader_version = instance.loader_version.clone().unwrap_or_default();
+            fabric_like::is_installed(&paths, flavor, &instance.minecraft_version, &loader_version)
+        }
+        mc_instance::LoaderKind::Forge | mc_instance::LoaderKind::NeoForge => {
+            let flavor = forge_flavor_for(instance.loader)?;
+            let loader_version = instance.loader_version.clone().unwrap_or_default();
+            forge_like::is_installed(&paths, flavor, &instance.minecraft_version, &loader_version)
+        }
+        mc_instance::LoaderKind::Optifine => {
+            let loader_version = instance.loader_version.clone().unwrap_or_default();
+            optifine::is_installed(&paths, &instance.minecraft_version, &loader_version)
+        }
+    })
 }
 
 #[tauri::command]
@@ -158,9 +346,73 @@ pub async fn install_instance(app: AppHandle, state: State<'_, AppState>, instan
         let _ = app_for_progress.emit("install-progress", p);
     });
 
-    mc_install::install_vanilla(&state.http, &state.downloads, &paths, &instance.minecraft_version, on_progress)
-        .await
-        .map_err(to_err)?;
+    match instance.loader {
+        mc_instance::LoaderKind::Vanilla => {
+            mc_install::install_vanilla(&state.http, &state.downloads, &paths, &instance.minecraft_version, on_progress)
+                .await
+                .map_err(to_err)?;
+        }
+        mc_instance::LoaderKind::Fabric | mc_instance::LoaderKind::Quilt => {
+            let flavor = flavor_for(instance.loader)?;
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+            fabric_like::install(
+                &state.http,
+                &state.downloads,
+                &paths,
+                flavor,
+                &instance.minecraft_version,
+                &loader_version,
+                on_progress,
+            )
+            .await
+            .map_err(to_err)?;
+        }
+        mc_instance::LoaderKind::Forge | mc_instance::LoaderKind::NeoForge => {
+            let flavor = forge_flavor_for(instance.loader)?;
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+            let java_installation = required_java_for(&app, &state, &cfg, &paths, &instance.minecraft_version).await?;
+            let app_data = config::app_data_dir(&app);
+            forge_like::install(
+                &state.http,
+                &state.downloads,
+                &app_data,
+                &paths,
+                &java_installation.path,
+                flavor,
+                &instance.minecraft_version,
+                &loader_version,
+                on_progress,
+            )
+            .await
+            .map_err(to_err)?;
+        }
+        mc_instance::LoaderKind::Optifine => {
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene un archivo de OptiFine importado".to_string())?;
+            let java_installation = required_java_for(&app, &state, &cfg, &paths, &instance.minecraft_version).await?;
+            let app_data = config::app_data_dir(&app);
+            optifine::install(
+                &state.http,
+                &state.downloads,
+                &app_data,
+                &paths,
+                &java_installation.path,
+                &instance.minecraft_version,
+                &loader_version,
+                on_progress,
+            )
+            .await
+            .map_err(to_err)?;
+        }
+    }
     Ok(())
 }
 
@@ -178,9 +430,42 @@ pub async fn launch_instance(
     let instance = mc_instance::load(&instances_dir, &instance_id).await.map_err(to_err)?;
     let paths = game_paths(&app, &cfg);
 
-    let detail = mc_install::load_version_detail(&state.http, &paths, &instance.minecraft_version, &paths.cache)
-        .await
-        .map_err(to_err)?;
+    let detail: VersionDetail = match instance.loader {
+        mc_instance::LoaderKind::Vanilla => {
+            mc_install::load_version_detail(&state.http, &paths, &instance.minecraft_version, &paths.cache)
+                .await
+                .map_err(to_err)?
+        }
+        mc_instance::LoaderKind::Fabric | mc_instance::LoaderKind::Quilt => {
+            let flavor = flavor_for(instance.loader)?;
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+            fabric_like::load_cached_detail(&paths, flavor, &instance.minecraft_version, &loader_version)
+                .await
+                .map_err(to_err)?
+        }
+        mc_instance::LoaderKind::Forge | mc_instance::LoaderKind::NeoForge => {
+            let flavor = forge_flavor_for(instance.loader)?;
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene una versión de loader asignada".to_string())?;
+            forge_like::load_cached_detail(&paths, flavor, &instance.minecraft_version, &loader_version)
+                .await
+                .map_err(to_err)?
+        }
+        mc_instance::LoaderKind::Optifine => {
+            let loader_version = instance
+                .loader_version
+                .clone()
+                .ok_or_else(|| "la instancia no tiene un archivo de OptiFine importado".to_string())?;
+            optifine::load_cached_detail(&paths, &instance.minecraft_version, &loader_version)
+                .await
+                .map_err(to_err)?
+        }
+    };
 
     let required_major = detail.java_version.as_ref().map(|j| j.major_version).unwrap_or(17);
     let managed_dir = config::java_runtime_dir(&app, &cfg);
@@ -191,10 +476,28 @@ pub async fn launch_instance(
 
     let app_data = config::app_data_dir(&app);
     let all_accounts = accounts::list_accounts(&app_data).await.map_err(to_err)?;
-    let account = all_accounts
+    let mut account = all_accounts
         .into_iter()
         .find(|a| a.id == account_id)
         .ok_or_else(|| "cuenta no encontrada".to_string())?;
+
+    // Las cuentas de Microsoft expiran (~1h) — si ya casi vence, la
+    // renovamos con el refresh token antes de lanzar, sin pedirle login al
+    // usuario de nuevo.
+    if matches!(account.kind, accounts::AccountKind::Microsoft) && accounts::microsoft::needs_refresh(&account) {
+        let client_id = cfg
+            .microsoft_client_id
+            .clone()
+            .ok_or_else(|| "No hay un microsoftClientId configurado.".to_string())?;
+        let refresh_token = account
+            .refresh_token
+            .clone()
+            .ok_or_else(|| "Esta cuenta de Microsoft no tiene refresh token — vuelve a iniciar sesión.".to_string())?;
+        account = accounts::microsoft::refresh_account(&state.http, &client_id, &refresh_token)
+            .await
+            .map_err(to_err)?;
+        accounts::upsert_account(&app_data, account.clone()).await.map_err(to_err)?;
+    }
 
     let (mut child, log_path) = mc_launch::launch(
         &paths,
@@ -207,6 +510,7 @@ pub async fn launch_instance(
             default_max_ram_mb: cfg.default_max_ram_mb,
             launcher_name: cfg.launcher_name.clone(),
             launcher_version: app.package_info().version.to_string(),
+            version_type_label: cfg.version_type_label.clone(),
         },
     )
     .await
@@ -363,4 +667,66 @@ pub async fn remove_account(app: AppHandle, account_id: String) -> Result<(), St
     accounts::remove_account(&config::app_data_dir(&app), &account_id)
         .await
         .map_err(to_err)
+}
+
+#[tauri::command]
+pub async fn start_microsoft_login(
+    state: State<'_, AppState>,
+) -> Result<accounts::microsoft::DeviceCodeInfo, String> {
+    let client_id = {
+        let cfg = state.config.read().unwrap();
+        cfg.microsoft_client_id.clone()
+    }
+    .ok_or_else(|| {
+        "No hay un microsoftClientId configurado. Ve al README para registrar tu propia app en Microsoft Entra."
+            .to_string()
+    })?;
+
+    let (info, pending) = accounts::microsoft::start_device_code(&state.http, &client_id)
+        .await
+        .map_err(to_err)?;
+    *state.pending_ms_login.write().unwrap() = Some(pending);
+    Ok(info)
+}
+
+#[tauri::command]
+pub async fn complete_microsoft_login(app: AppHandle, state: State<'_, AppState>) -> Result<Account, String> {
+    let client_id = {
+        let cfg = state.config.read().unwrap();
+        cfg.microsoft_client_id.clone()
+    }
+    .ok_or_else(|| "No hay un microsoftClientId configurado.".to_string())?;
+
+    // El login puede tardar minutos (el usuario tiene que ir a completar el
+    // paso en el navegador) — el `PendingLogin` no se puede clonar/mantener
+    // el lock abierto todo ese tiempo, así que lo sacamos del estado ahora y
+    // lo regresamos si falla, para poder reintentar sin pedir un código nuevo.
+    let pending = state
+        .pending_ms_login
+        .write()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "No hay un login de Microsoft en curso — empieza de nuevo.".to_string())?;
+
+    let result = accounts::microsoft::complete_login(&state.http, &client_id, &pending).await;
+
+    match result {
+        Ok(account) => {
+            let app_data = config::app_data_dir(&app);
+            accounts::upsert_account(&app_data, account.clone()).await.map_err(to_err)?;
+            Ok(account)
+        }
+        Err(err) => {
+            // Timeout/cancelado: no tiene caso reintentar con el mismo
+            // device_code (ya expiró o el usuario lo rechazó). Cualquier
+            // otro error (de red, por ejemplo) sí vale la pena reintentar.
+            if !matches!(
+                err,
+                accounts::microsoft::MicrosoftAuthError::TimedOut | accounts::microsoft::MicrosoftAuthError::Declined
+            ) {
+                *state.pending_ms_login.write().unwrap() = Some(pending);
+            }
+            Err(to_err(err))
+        }
+    }
 }

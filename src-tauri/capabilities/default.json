@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Permisos por defecto para la ventana principal del launcher",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:allow-open"]
+  "permissions": ["core:default", "shell:allow-open", "dialog:allow-open"]
 }
