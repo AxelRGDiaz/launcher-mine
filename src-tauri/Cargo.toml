@@ -1,5 +1,5 @@
 [package]
-name = "launcher"
+name = "pikipiki-launcher"
 version = "0.1.0"
 description = "Launcher de Minecraft personalizable, ligero y sin telemetría"
 edition = "2021"
