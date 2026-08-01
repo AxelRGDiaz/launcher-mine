@@ -32,10 +32,13 @@ pub fn run() {
             // arranque de la app — y si Discord no está corriendo, debe
             // fallar en silencio sin afectar nada más.
             let discord_handle = app.handle().clone();
-            tokio::task::spawn_blocking(move || {
-                let state = discord_handle.state::<AppState>();
-                state.discord.configure(discord_client_id);
-                state.discord.set_menu(&launcher_name);
+            tauri::async_runtime::spawn(async move {
+                let _ = tokio::task::spawn_blocking(move || {
+                    let state = discord_handle.state::<AppState>();
+                    state.discord.configure(discord_client_id);
+                    state.discord.set_menu(&launcher_name);
+                })
+                .await;
             });
             Ok(())
         })

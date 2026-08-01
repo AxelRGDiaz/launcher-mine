@@ -97,8 +97,11 @@ pub fn save_config(app: AppHandle, state: State<AppState>, config: LauncherConfi
     *state.config.write().unwrap() = config.clone();
     let discord_handle = app.clone();
     let launcher_name = config.launcher_name.clone();
-    tokio::task::spawn_blocking(move || {
-        discord_handle.state::<AppState>().discord.set_menu(&launcher_name);
+    tauri::async_runtime::spawn(async move {
+        let _ = tokio::task::spawn_blocking(move || {
+            discord_handle.state::<AppState>().discord.set_menu(&launcher_name);
+        })
+        .await;
     });
     Ok(config)
 }
@@ -542,9 +545,12 @@ pub async fn launch_instance(
         let minecraft_version = instance.minecraft_version.clone();
         let loader_label = format!("{:?}", instance.loader);
         let started_at_unix = chrono::Utc::now().timestamp();
-        tokio::task::spawn_blocking(move || {
-            let state = discord_handle.state::<AppState>();
-            state.discord.set_playing(&instance_name, &minecraft_version, &loader_label, started_at_unix);
+        tauri::async_runtime::spawn(async move {
+            let _ = tokio::task::spawn_blocking(move || {
+                let state = discord_handle.state::<AppState>();
+                state.discord.set_playing(&instance_name, &minecraft_version, &loader_label, started_at_unix);
+            })
+            .await;
         });
     }
 
