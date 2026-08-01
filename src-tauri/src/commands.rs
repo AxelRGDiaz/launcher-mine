@@ -109,7 +109,16 @@ pub fn save_config(app: AppHandle, state: State<AppState>, config: LauncherConfi
 #[tauri::command]
 pub fn reset_config(app: AppHandle, state: State<AppState>) -> Result<LauncherConfig, String> {
     let defaults = config::reset_to_defaults(&app).map_err(to_err)?;
+    state.discord.configure(defaults.discord_client_id.clone());
     *state.config.write().unwrap() = defaults.clone();
+    let discord_handle = app.clone();
+    let launcher_name = defaults.launcher_name.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = tokio::task::spawn_blocking(move || {
+            discord_handle.state::<AppState>().discord.set_menu(&launcher_name);
+        })
+        .await;
+    });
     Ok(defaults)
 }
 
