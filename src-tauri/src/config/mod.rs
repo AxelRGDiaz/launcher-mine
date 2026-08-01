@@ -97,11 +97,28 @@ pub fn load(app: &AppHandle) -> Result<LauncherConfig, ConfigError> {
     let path = user_config_path(app)?;
     if path.exists() {
         let raw = std::fs::read_to_string(&path)?;
-        // Si el usuario dejó el JSON corrupto, no tumbamos el launcher: caemos
-        // a los defaults en memoria (sin sobreescribir su archivo, por si lo
-        // quiere recuperar a mano).
-        match serde_json::from_str::<LauncherConfig>(&raw) {
-            Ok(cfg) => Ok(cfg),
+        // Se fusiona sobre los defaults (en vez de deserializar el archivo
+        // del usuario tal cual) para que un config.json guardado con una
+        // versión vieja del launcher —sin campos que se agregaron después,
+        // como `discordClientId`— herede el valor real por defecto de esos
+        // campos nuevos en vez de caer en el `Option::None`/`""` genérico
+        // que le tocaría por `#[serde(default)]`.
+        match serde_json::from_str::<serde_json::Value>(&raw) {
+            Ok(saved) => {
+                let mut merged = serde_json::to_value(LauncherConfig::defaults())?;
+                if let (Some(merged_obj), Some(saved_obj)) = (merged.as_object_mut(), saved.as_object()) {
+                    for (key, value) in saved_obj {
+                        merged_obj.insert(key.clone(), value.clone());
+                    }
+                }
+                match serde_json::from_value::<LauncherConfig>(merged) {
+                    Ok(cfg) => Ok(cfg),
+                    Err(err) => {
+                        tracing::warn!("config.json inválido ({err}), usando valores por defecto");
+                        Ok(LauncherConfig::defaults())
+                    }
+                }
+            }
             Err(err) => {
                 tracing::warn!("config.json inválido ({err}), usando valores por defecto");
                 Ok(LauncherConfig::defaults())

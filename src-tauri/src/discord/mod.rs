@@ -61,7 +61,12 @@ impl DiscordPresence {
         let mut client_guard = self.client.lock().unwrap();
         let Some(client) = client_guard.as_mut() else { return };
 
-        let mut act = activity::Activity::new().details(details).state(state);
+        // "logo" es la clave del asset subido en el portal de Discord
+        // (Developer Portal -> tu app -> Rich Presence -> Art Assets).
+        let mut act = activity::Activity::new()
+            .details(details)
+            .state(state)
+            .assets(activity::Assets::new().large_image("logo").large_text("PIKIPIKI LAUNCHER"));
         if let Some(ts) = started_at {
             act = act.timestamps(activity::Timestamps::new().start(ts));
         }
