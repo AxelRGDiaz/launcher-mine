@@ -39,16 +39,18 @@ impl DiscordPresence {
             return true;
         }
         let Some(id) = self.client_id.lock().unwrap().clone() else {
+            tracing::info!("Discord Rich Presence: no hay client_id configurado, desactivado");
             return false;
         };
         let mut candidate = DiscordIpcClient::new(&id);
         match candidate.connect() {
             Ok(()) => {
+                tracing::info!("Discord Rich Presence conectado (client_id: {id})");
                 *client_guard = Some(candidate);
                 true
             }
             Err(err) => {
-                tracing::debug!("Discord Rich Presence no disponible: {err}");
+                tracing::warn!("Discord Rich Presence no disponible (client_id: {id}): {err}");
                 false
             }
         }
@@ -70,10 +72,13 @@ impl DiscordPresence {
         if let Some(ts) = started_at {
             act = act.timestamps(activity::Timestamps::new().start(ts));
         }
-        if client.set_activity(act).is_err() {
+        if let Err(err) = client.set_activity(act) {
+            tracing::warn!("Discord Rich Presence: set_activity falló, reconectando en el próximo intento: {err}");
             // La conexión se cayó (Discord se cerró, etc.) — se descarta y se
             // reintenta conectar en la próxima actualización de presencia.
             *client_guard = None;
+        } else {
+            tracing::info!("Discord Rich Presence actualizado: details={details:?} state={state:?}");
         }
     }
 

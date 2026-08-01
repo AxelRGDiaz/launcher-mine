@@ -12,10 +12,6 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -23,6 +19,29 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // En release, Windows compila la app sin consola adjunta (para
+            // que no aparezca una ventana negra detrás de la GUI) — por eso
+            // los logs por stdout no sirven para diagnosticar nada ahí, ni
+            // siquiera corriendo el .exe desde cmd/PowerShell. Se escriben a
+            // un archivo real en su lugar.
+            let log_dir = config::app_data_dir(&handle);
+            let _ = std::fs::create_dir_all(&log_dir);
+            let log_file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("launcher.log"));
+            let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+            match log_file {
+                Ok(file) => {
+                    tracing_subscriber::fmt().with_env_filter(env_filter).with_ansi(false).with_writer(file).init();
+                }
+                Err(_) => {
+                    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+                }
+            }
+
             let cfg = config::load(&handle).expect("no se pudo cargar la configuración del launcher");
             let launcher_name = cfg.launcher_name.clone();
             let discord_client_id = cfg.discord_client_id.clone();
