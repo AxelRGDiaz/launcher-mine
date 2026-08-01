@@ -293,6 +293,26 @@ real. **No es un bypass ni un crack** — es el mismo modo "cuenta sin
 conexión" que ofrecen MultiMC/Prism Launcher para pruebas en un solo jugador
 con una copia ya poseída.
 
+### Discord Rich Presence (opcional)
+
+Si Discord está corriendo en la máquina, el launcher se conecta por su IPC
+local (sin servidor propio) y muestra un estado en tu perfil: "En el menú"
+mientras navegas el launcher, y "Jugando \<nombre de la versión\>" con la
+versión de Minecraft/loader y tiempo transcurrido mientras el juego está
+abierto. Si Discord no está instalado o no está corriendo, esto simplemente
+no hace nada — el resto del launcher sigue funcionando igual.
+
+Como con Microsoft, hace falta tu propio `client_id` — es gratis y toma un
+minuto:
+
+1. [discord.com/developers/applications](https://discord.com/developers/applications)
+   → **New Application**, ponle el nombre que quieras (es lo que puede
+   aparecer junto al estado)
+2. Copia el **Application ID** de la pantalla "General Information"
+3. Pégalo en `discordClientId` en `config/config.default.json`
+
+Sin ese campo (`null` por defecto), la función queda desactivada.
+
 ## Limitaciones conocidas de esta fase
 
 - El orden de las versiones de Forge/NeoForge en el selector es un

@@ -18,6 +18,7 @@ export interface LauncherConfig {
   applyTitleScreenPack: boolean;
   versionTypeLabel: string;
   microsoftClientId: string | null;
+  discordClientId: string | null;
 }
 
 export interface JavaInstallation {

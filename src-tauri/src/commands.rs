@@ -93,7 +93,13 @@ pub struct BrandingImages {
 #[tauri::command]
 pub fn save_config(app: AppHandle, state: State<AppState>, config: LauncherConfig) -> Result<LauncherConfig, String> {
     config::save(&app, &config).map_err(to_err)?;
+    state.discord.configure(config.discord_client_id.clone());
     *state.config.write().unwrap() = config.clone();
+    let discord_handle = app.clone();
+    let launcher_name = config.launcher_name.clone();
+    tokio::task::spawn_blocking(move || {
+        discord_handle.state::<AppState>().discord.set_menu(&launcher_name);
+    });
     Ok(config)
 }
 
@@ -530,6 +536,18 @@ pub async fn launch_instance(
         .unwrap()
         .insert(instance_id.clone(), RunningGame { child, log_path });
 
+    {
+        let discord_handle = app.clone();
+        let instance_name = instance.name.clone();
+        let minecraft_version = instance.minecraft_version.clone();
+        let loader_label = format!("{:?}", instance.loader);
+        let started_at_unix = chrono::Utc::now().timestamp();
+        tokio::task::spawn_blocking(move || {
+            let state = discord_handle.state::<AppState>();
+            state.discord.set_playing(&instance_name, &minecraft_version, &loader_label, started_at_unix);
+        });
+    }
+
     watch_for_exit(app, instances_dir, instance_id, started_at);
     Ok(())
 }
@@ -565,6 +583,12 @@ fn watch_for_exit(app: AppHandle, instances_dir: PathBuf, instance_id: String, s
                 let secs = started_at.elapsed().as_secs();
                 let _ = mc_instance::record_session(&instances_dir, &instance_id, secs).await;
                 let _ = app.emit("instance-exited", &instance_id);
+
+                let discord_handle = app.clone();
+                let launcher_name = discord_handle.state::<AppState>().config.read().unwrap().launcher_name.clone();
+                tokio::task::spawn_blocking(move || {
+                    discord_handle.state::<AppState>().discord.set_menu(&launcher_name);
+                });
                 break;
             }
         }

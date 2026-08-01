@@ -52,6 +52,12 @@ pub struct LauncherConfig {
     /// incluir un client_id genérico).
     #[serde(default)]
     pub microsoft_client_id: Option<String>,
+    /// "Application ID" de una app registrada en el portal de
+    /// desarrolladores de Discord (discord.com/developers/applications),
+    /// para mostrar el launcher/el juego como "Playing" en Discord. `None` =
+    /// función desactivada, sin ningún efecto en el resto del launcher.
+    #[serde(default)]
+    pub discord_client_id: Option<String>,
 }
 
 fn default_version_type_label() -> String {

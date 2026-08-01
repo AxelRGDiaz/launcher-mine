@@ -1,5 +1,6 @@
 use crate::accounts::microsoft::PendingLogin;
 use crate::config::LauncherConfig;
+use crate::discord::DiscordPresence;
 use crate::download::DownloadManager;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -17,6 +18,7 @@ pub struct AppState {
     /// `complete_microsoft_login`) — solo uno a la vez, es una acción de UI
     /// modal, no concurrente.
     pub pending_ms_login: RwLock<Option<PendingLogin>>,
+    pub discord: DiscordPresence,
 }
 
 pub struct RunningGame {
@@ -40,6 +42,7 @@ impl AppState {
             http,
             running_instances: RwLock::new(HashMap::new()),
             pending_ms_login: RwLock::new(None),
+            discord: DiscordPresence::new(),
         }
     }
 }

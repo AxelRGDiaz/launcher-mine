@@ -1,6 +1,7 @@
 mod accounts;
 mod commands;
 mod config;
+mod discord;
 mod download;
 mod java;
 mod minecraft;
@@ -23,7 +24,19 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             let cfg = config::load(&handle).expect("no se pudo cargar la configuración del launcher");
+            let launcher_name = cfg.launcher_name.clone();
+            let discord_client_id = cfg.discord_client_id.clone();
             app.manage(AppState::new(cfg));
+
+            // La conexión IPC a Discord es bloqueante y no debe demorar el
+            // arranque de la app — y si Discord no está corriendo, debe
+            // fallar en silencio sin afectar nada más.
+            let discord_handle = app.handle().clone();
+            tokio::task::spawn_blocking(move || {
+                let state = discord_handle.state::<AppState>();
+                state.discord.configure(discord_client_id);
+                state.discord.set_menu(&launcher_name);
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

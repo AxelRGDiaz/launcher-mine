@@ -17,5 +17,6 @@
   "defaultServerAddress": "pikipiki.axel-diaz.com",
   "applyTitleScreenPack": true,
   "versionTypeLabel": "PikiPiki",
-  "microsoftClientId": "b135926e-046e-44e8-a2f6-9d1cbd6f190a"
+  "microsoftClientId": "b135926e-046e-44e8-a2f6-9d1cbd6f190a",
+  "discordClientId": null
 }
