@@ -77,6 +77,8 @@ export const api = {
     remove: (accountId: string) => invoke<void>("remove_account", { accountId }),
     startMicrosoftLogin: () => invoke<DeviceCodeInfo>("start_microsoft_login"),
     completeMicrosoftLogin: () => invoke<Account>("complete_microsoft_login"),
+    changeSkin: (accountId: string, fileBytes: number[], variant: "classic" | "slim") =>
+      invoke<Account>("change_skin", { accountId, fileBytes, variant }),
   },
 
   events: {

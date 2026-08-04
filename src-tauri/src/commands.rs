@@ -769,3 +769,30 @@ pub async fn complete_microsoft_login(app: AppHandle, state: State<'_, AppState>
         }
     }
 }
+
+#[tauri::command]
+pub async fn change_skin(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    account_id: String,
+    file_bytes: Vec<u8>,
+    variant: String,
+) -> Result<Account, String> {
+    let app_data = config::app_data_dir(&app);
+    let all_accounts = accounts::list_accounts(&app_data).await.map_err(to_err)?;
+    let mut account = all_accounts
+        .into_iter()
+        .find(|a| a.id == account_id)
+        .ok_or_else(|| "cuenta no encontrada".to_string())?;
+
+    if !matches!(account.kind, accounts::AccountKind::Microsoft) {
+        return Err("Solo las cuentas de Microsoft pueden cambiar de skin.".to_string());
+    }
+
+    let skin_url = accounts::microsoft::upload_skin(&state.http, &account.access_token, file_bytes, &variant)
+        .await
+        .map_err(to_err)?;
+    account.skin_url = skin_url;
+    accounts::upsert_account(&app_data, account.clone()).await.map_err(to_err)?;
+    Ok(account)
+}

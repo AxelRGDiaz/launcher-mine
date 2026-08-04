@@ -23,6 +23,7 @@ const XBL_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MC_LOGIN_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+const MC_SKIN_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
 
 #[derive(thiserror::Error, Debug)]
 pub enum MicrosoftAuthError {
@@ -274,6 +275,29 @@ async fn fetch_profile(http: &reqwest::Client, mc_access_token: &str) -> Result<
         return Err(MicrosoftAuthError::NoGameOwnership);
     }
     Ok(resp.error_for_status()?.json().await?)
+}
+
+/// Sube una skin nueva (PNG 64x64) para una cuenta de Microsoft ya
+/// autenticada. `variant` es `"classic"` (modelo Steve) o `"slim"` (modelo
+/// Alex). Devuelve la URL de la skin activa tras el cambio.
+pub async fn upload_skin(
+    http: &reqwest::Client,
+    mc_access_token: &str,
+    file_bytes: Vec<u8>,
+    variant: &str,
+) -> Result<Option<String>, MicrosoftAuthError> {
+    let part = reqwest::multipart::Part::bytes(file_bytes).file_name("skin.png").mime_str("image/png")?;
+    let form = reqwest::multipart::Form::new().text("variant", variant.to_string()).part("file", part);
+    let profile: McProfile = http
+        .post(MC_SKIN_URL)
+        .bearer_auth(mc_access_token)
+        .multipart(form)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    Ok(profile.skins.into_iter().find(|s| s.state == "ACTIVE").map(|s| s.url))
 }
 
 async fn build_account_from_ms_token(

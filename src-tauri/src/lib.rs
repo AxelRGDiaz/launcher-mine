@@ -88,6 +88,7 @@ pub fn run() {
             commands::remove_account,
             commands::start_microsoft_login,
             commands::complete_microsoft_login,
+            commands::change_skin,
         ])
         .run(tauri::generate_context!())
         .expect("error corriendo la aplicación Tauri");

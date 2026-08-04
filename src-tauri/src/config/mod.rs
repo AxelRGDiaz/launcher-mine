@@ -97,22 +97,36 @@ pub fn load(app: &AppHandle) -> Result<LauncherConfig, ConfigError> {
     let path = user_config_path(app)?;
     if path.exists() {
         let raw = std::fs::read_to_string(&path)?;
-        // Se fusiona sobre los defaults (en vez de deserializar el archivo
-        // del usuario tal cual) para que un config.json guardado con una
-        // versión vieja del launcher —sin campos que se agregaron después,
-        // como `discordClientId`— herede el valor real por defecto de esos
-        // campos nuevos en vez de caer en el `Option::None`/`""` genérico
-        // que le tocaría por `#[serde(default)]`.
         match serde_json::from_str::<serde_json::Value>(&raw) {
-            Ok(saved) => {
+            Ok(saved_value) => {
+                // Se deserializa lo guardado fusionado sobre los defaults
+                // (para que campos ausentes por venir de una versión vieja
+                // no rompan el parseo), pero de ahí solo se copian los
+                // campos que de verdad se editan desde Configuración —ver
+                // `Settings.tsx`—. Todo lo demás (nombre, logo, colores,
+                // supportUrl, client_ids...) se fija antes de compilar y
+                // siempre debe reflejar lo que trae ESTE binario: si no,
+                // una instalación vieja se queda para siempre con valores
+                // placeholder o client_ids que ya no aplican.
                 let mut merged = serde_json::to_value(LauncherConfig::defaults())?;
-                if let (Some(merged_obj), Some(saved_obj)) = (merged.as_object_mut(), saved.as_object()) {
+                if let (Some(merged_obj), Some(saved_obj)) = (merged.as_object_mut(), saved_value.as_object()) {
                     for (key, value) in saved_obj {
                         merged_obj.insert(key.clone(), value.clone());
                     }
                 }
                 match serde_json::from_value::<LauncherConfig>(merged) {
-                    Ok(cfg) => Ok(cfg),
+                    Ok(saved_cfg) => {
+                        let mut cfg = LauncherConfig::defaults();
+                        cfg.theme = saved_cfg.theme;
+                        cfg.show_snapshots = saved_cfg.show_snapshots;
+                        cfg.default_min_ram_mb = saved_cfg.default_min_ram_mb;
+                        cfg.default_max_ram_mb = saved_cfg.default_max_ram_mb;
+                        cfg.default_server_name = saved_cfg.default_server_name;
+                        cfg.default_server_address = saved_cfg.default_server_address;
+                        cfg.apply_title_screen_pack = saved_cfg.apply_title_screen_pack;
+                        cfg.version_type_label = saved_cfg.version_type_label;
+                        Ok(cfg)
+                    }
                     Err(err) => {
                         tracing::warn!("config.json inválido ({err}), usando valores por defecto");
                         Ok(LauncherConfig::defaults())

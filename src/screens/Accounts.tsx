@@ -12,6 +12,8 @@ export function Accounts() {
 
   const [deviceCode, setDeviceCode] = useState<DeviceCodeInfo | null>(null);
   const [msStatus, setMsStatus] = useState<"idle" | "waiting" | "polling">("idle");
+  const [skinVariant, setSkinVariant] = useState<Record<string, "classic" | "slim">>({});
+  const [skinBusyId, setSkinBusyId] = useState<string | null>(null);
 
   async function refresh() {
     setAccounts(await api.accounts.list());
@@ -35,6 +37,22 @@ export function Accounts() {
   async function handleRemove(id: string) {
     await api.accounts.remove(id);
     await refresh();
+  }
+
+  async function handleSkinChange(accountId: string, file: File) {
+    setError(null);
+    setSkinBusyId(accountId);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = Array.from(new Uint8Array(buffer));
+      const variant = skinVariant[accountId] ?? "classic";
+      await api.accounts.changeSkin(accountId, bytes, variant);
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSkinBusyId(null);
+    }
   }
 
   async function handleMicrosoftLogin() {
@@ -140,6 +158,34 @@ export function Accounts() {
               </div>
               <p className="truncate text-xs text-text-muted">{account.uuid}</p>
             </div>
+            {account.kind === "microsoft" && (
+              <div className="flex shrink-0 items-center gap-2">
+                <select
+                  value={skinVariant[account.id] ?? "classic"}
+                  onChange={(e) =>
+                    setSkinVariant((prev) => ({ ...prev, [account.id]: e.target.value as "classic" | "slim" }))
+                  }
+                  className="rounded-md border border-border bg-surface-sunken px-2 py-1.5 text-xs text-text"
+                >
+                  <option value="classic">Steve</option>
+                  <option value="slim">Alex</option>
+                </select>
+                <label className="cursor-pointer rounded-md border border-border px-2 py-1.5 text-xs text-text hover:bg-surface-sunken">
+                  {skinBusyId === account.id ? "Subiendo…" : "Cambiar skin"}
+                  <input
+                    type="file"
+                    accept="image/png"
+                    disabled={skinBusyId === account.id}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void handleSkinChange(account.id, file);
+                    }}
+                  />
+                </label>
+              </div>
+            )}
             <button
               onClick={() => handleRemove(account.id)}
               className="shrink-0 rounded-md px-2 py-1.5 text-xs text-text-muted hover:bg-surface-sunken hover:text-red-400"
