@@ -167,12 +167,10 @@ fn glob_lite(pattern: &str) -> std::io::Result<Vec<PathBuf>> {
 /// Ejecuta `java -XshowSettings:properties -version` y parsea la versión y
 /// arquitectura reales de esa instalación (más fiable que asumir por la ruta).
 pub async fn probe(java_bin: &Path, managed_dir: &Path) -> Option<JavaInstallation> {
-    let output = Command::new(java_bin)
-        .arg("-XshowSettings:properties")
-        .arg("-version")
-        .output()
-        .await
-        .ok()?;
+    let mut cmd = Command::new(java_bin);
+    cmd.arg("-XshowSettings:properties").arg("-version");
+    crate::process_ext::hide_console(&mut cmd);
+    let output = cmd.output().await.ok()?;
 
     // java -version imprime en stderr.
     let text = String::from_utf8_lossy(&output.stderr);

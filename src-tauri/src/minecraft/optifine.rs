@@ -227,11 +227,10 @@ pub async fn install(
         total_files: 0,
     });
 
-    let mut child = tokio::process::Command::new(java_path)
-        .arg("-jar")
-        .arg(&jar_path)
-        .spawn()
-        .map_err(McError::Io)?;
+    let mut cmd = tokio::process::Command::new(java_path);
+    cmd.arg("-jar").arg(&jar_path);
+    crate::process_ext::hide_console(&mut cmd);
+    let mut child = cmd.spawn().map_err(McError::Io)?;
     child.wait().await.map_err(McError::Io)?;
 
     let after = existing_version_ids(&minecraft_dir).await;

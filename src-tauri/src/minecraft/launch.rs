@@ -83,6 +83,7 @@ pub async fn launch(paths: &GamePaths, req: LaunchRequest<'_>) -> Result<(Child,
         .current_dir(&game_dir)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    crate::process_ext::hide_console(&mut command);
 
     let child = command.spawn().map_err(McError::Io)?;
 

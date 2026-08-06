@@ -5,6 +5,7 @@ mod discord;
 mod download;
 mod java;
 mod minecraft;
+mod process_ext;
 mod state;
 
 use state::AppState;

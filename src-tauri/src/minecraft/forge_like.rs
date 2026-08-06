@@ -238,14 +238,10 @@ async fn read_resulting_version_id(installer_path: &Path) -> Result<String, McEr
 }
 
 async fn run_installer(java_path: &Path, installer_path: &Path, target_dir: &Path) -> Result<(), McError> {
-    let output = tokio::process::Command::new(java_path)
-        .arg("-jar")
-        .arg(installer_path)
-        .arg("--installClient")
-        .arg(target_dir)
-        .output()
-        .await
-        .map_err(McError::Io)?;
+    let mut cmd = tokio::process::Command::new(java_path);
+    cmd.arg("-jar").arg(installer_path).arg("--installClient").arg(target_dir);
+    crate::process_ext::hide_console(&mut cmd);
+    let output = cmd.output().await.map_err(McError::Io)?;
 
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
