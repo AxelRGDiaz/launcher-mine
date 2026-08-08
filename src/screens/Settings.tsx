@@ -8,7 +8,8 @@ import { ProgressBar } from "@/components/ProgressBar";
 const JAVA_MAJORS: { major: number; hint: string }[] = [
   { major: 8, hint: "Minecraft 1.16 y anteriores" },
   { major: 17, hint: "Minecraft 1.17 – 1.20.4" },
-  { major: 21, hint: "Minecraft 1.20.5 y superior" },
+  { major: 21, hint: "Minecraft 1.20.5 – 26.1" },
+  { major: 25, hint: "Minecraft 26.2 y superior" },
 ];
 
 export function Settings() {
@@ -20,6 +21,7 @@ export function Settings() {
   const [javaProgress, setJavaProgress] = useState<{ downloaded: number; total: number | null } | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customMajor, setCustomMajor] = useState("");
 
   useEffect(() => setDraft(config), [config]);
 
@@ -233,6 +235,28 @@ export function Settings() {
               <span className="text-xs text-text-muted">{hint}</span>
             </div>
           ))}
+        </div>
+        <div className="flex items-end gap-2">
+          <Field label="Otra versión (si Minecraft pide un Java más nuevo que no está arriba)">
+            <input
+              type="number"
+              min={8}
+              value={customMajor}
+              onChange={(e) => setCustomMajor(e.target.value)}
+              placeholder="ej. 25"
+              className="input w-32"
+            />
+          </Field>
+          <button
+            onClick={() => {
+              const major = parseInt(customMajor, 10);
+              if (Number.isFinite(major) && major >= 8) void handleInstallJava(major);
+            }}
+            disabled={installingMajor !== null || !customMajor}
+            className="rounded-md border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-raised disabled:opacity-50"
+          >
+            Instalar
+          </button>
         </div>
         {installingMajor !== null && (
           <ProgressBar
